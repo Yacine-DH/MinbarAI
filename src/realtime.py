@@ -7,6 +7,7 @@ from faster_whisper import WhisperModel
 from translate import Translator
 from arabic_reshaper import reshape
 from bidi.algorithm import get_display
+from display import update_display
 
 # Settings
 SAMPLE_RATE = 16000
@@ -83,6 +84,8 @@ def audio_callback(indata, frames, time, status):
 
 def process_audio():
     print("\n[Started background processor]", flush=True)
+    # Initialize with default display
+    update_display("في انتظار الخطبة...", "Warte auf die Khutbah...")
     proc_count = [0]
     
     while True:
@@ -112,6 +115,9 @@ def process_audio():
                     print(f"📤 YOUR INPUT (Arabic):\n    {display_arabic}\n", flush=True)
                     print(f"📥 TRANSLATION (German):\n    {german}\n", flush=True)
                     print(f"{'='*60}\n", flush=True)
+                    
+                    # Update the web display
+                    update_display(arabic, german)
             
             if not found_speech:
                 print(f"❌ No speech detected in chunk #{proc_count[0]}\n", flush=True)
