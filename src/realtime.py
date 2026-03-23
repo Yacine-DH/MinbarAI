@@ -7,15 +7,14 @@ from faster_whisper import WhisperModel
 from translate import Translator
 from arabic_reshaper import reshape
 from bidi.algorithm import get_display
-from display import update_display
+from display import update_display, start_http_server
 
 # Settings
 SAMPLE_RATE = 16000
-VAD_THRESHOLD = 0.03  # Much higher threshold - only loud speech (was 0.005)
-CHUNK_SECONDS = 3  # Accumulate 3 seconds of detected speech before processing
-
-# Debug mode - show every frame
-DEBUG = True
+VAD_THRESHOLD = 0.02  # Lower threshold slightly for better sensitivity
+SILENCE_DURATION = 1.5  # Require 1.5 seconds of silence (natural pause)
+MAX_SENTENCE_LENGTH = 15  # Maximum seconds to buffer before forcing translation
+MIN_BUFFER_SIZE = 6  # Minimum chunks to buffer before checking for end-of-sentence
 
 # Get device from command line argument
 DEVICE = None
@@ -45,10 +44,13 @@ except Exception as e:
 
 audio_queue = queue.Queue()
 speech_buffer = []  # Buffer for accumulating speech frames
+last_speech_time = [None]  # Track when the last speech was detected
 frame_count = [0]  # Track frames
+import time
 
-def audio_callback(indata, frames, time, status):
+def audio_callback(indata, frames, time_info, status):
     frame_count[0] += 1
+    current_time = time.time()
     
     if status:
         print(f"\n📢 Audio status: {status}", flush=True)
@@ -59,28 +61,34 @@ def audio_callback(indata, frames, time, status):
     # Calculate energy (RMS) for voice activity detection
     energy = np.sqrt(np.mean(audio_data**2))
     
-    # Show every frame to keep output flowing
-    if frame_count[0] % 5 == 0:  # Every 5 frames
+    # Show every 40 frames to keep output flowing
+    if frame_count[0] % 40 == 0:  # Every 40 frames (~10 seconds at 256ms blocks)
         if energy > VAD_THRESHOLD:
             bar = "█" * min(int(energy * 50), 15)
-            print(f"🎤 VOICE: {bar} (Energy: {energy:.4f})", flush=True)
-        else:
-            print(f"🔇 (listening...)", end="\r", flush=True)
+            print(f"🎤 LISTENING ({len(speech_buffer)} chunks buffered): {bar} (Energy: {energy:.4f})", flush=True)
     
     if energy > VAD_THRESHOLD:  # Speech detected
         speech_buffer.append(audio_data)
+        last_speech_time[0] = current_time  # Update last speech time
         
-        # When buffer reaches ~3 seconds of speech, queue it for processing
-        if len(speech_buffer) >= int(CHUNK_SECONDS * SAMPLE_RATE / frames):
-            print(f"\n⏳ BUFFERED {len(speech_buffer)} chunks - sending to Whisper...\n", flush=True)
+        # Max buffer size: ~30 seconds of speech (force translation if too long)
+        max_time = MAX_SENTENCE_LENGTH * SAMPLE_RATE
+        if len(speech_buffer) * frames >= max_time:
+            print(f"\n⏳ MAX SENTENCE LENGTH REACHED ({len(speech_buffer)} chunks) - Force sending to Whisper...\n", flush=True)
             audio_queue.put(np.concatenate(speech_buffer))
             speech_buffer.clear()
+            last_speech_time[0] = None
     else:
-        # If we have buffered speech and now have silence, process it immediately
-        if speech_buffer:
-            print(f"\n⏳ SILENCE DETECTED - sending buffered {len(speech_buffer)} chunks to Whisper...\n", flush=True)
-            audio_queue.put(np.concatenate(speech_buffer))
-            speech_buffer.clear()
+        # Check if we have buffered speech and enough silence has passed
+        if speech_buffer and last_speech_time[0] is not None:
+            silence_duration = current_time - last_speech_time[0]
+            
+            # Only consider end-of-sentence if we have at least MIN_BUFFER_SIZE chunks
+            if len(speech_buffer) >= MIN_BUFFER_SIZE and silence_duration >= SILENCE_DURATION:
+                print(f"\n⏳ COMPLETE SENTENCE ({len(speech_buffer)} chunks, {silence_duration:.1f}s silence) - Sending to Whisper...\n", flush=True)
+                audio_queue.put(np.concatenate(speech_buffer))
+                speech_buffer.clear()
+                last_speech_time[0] = None
 
 def process_audio():
     print("\n[Started background processor]", flush=True)
@@ -132,12 +140,16 @@ def process_audio():
 thread = threading.Thread(target=process_audio, daemon=True)
 thread.start()
 
+# Start HTTP server in background
+start_http_server()
+
 # Start listening
 try:
     print("\n" + "="*60, flush=True)
     print("🎤 MINBAR AI - REAL-TIME ARABIC → GERMAN TRANSLATOR", flush=True)
     print("="*60, flush=True)
     print("Listening on: JBL Tune 720BT (Device #18)", flush=True)
+    print("🌐 Web Display: http://localhost:8080/", flush=True)
     print("="*60 + "\n", flush=True)
     
     # Use 256ms blocks for responsive detection, but never block during processing
@@ -146,7 +158,7 @@ try:
                         blocksize=blocksize, device=DEVICE):
         print("✅ Microphone READY", flush=True)
         print("\n🎙️  SPEAK ARABIC - WATCH BELOW FOR WHAT YOU SAY AND THE TRANSLATION:\n", flush=True)
-        print("="*60 + "\n", flush=True)
+        print("="*60 + "\n", flush=True)    
         
         while True:
             sd.sleep(1000)
