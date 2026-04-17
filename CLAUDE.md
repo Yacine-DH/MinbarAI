@@ -21,7 +21,7 @@ pip install -r requirements.txt
 ```bash
 # Real-time microphone translation (main use case)
 python src/realtime.py              # uses default mic
-python src/realtime.py 18           # specify device ID
+python src/realtime.py 0           # specify device ID
 
 # List available microphone devices
 python src/list_devices.py
