@@ -6,9 +6,9 @@ import sounddevice as sd
 
 SAMPLE_RATE = 16000
 VAD_THRESHOLD = 0.02
-SILENCE_DURATION = 1.5
+SILENCE_DURATION = 0.8
 MAX_SENTENCE_SECONDS = 15
-MIN_CHUNKS = 6
+MIN_CHUNKS = 3
 BLOCK_SIZE = int(SAMPLE_RATE * 0.256)  # 256ms per chunk
 
 audio_queue = queue.Queue()
