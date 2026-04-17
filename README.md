@@ -6,22 +6,23 @@
 
 ## What is MinbarAI?
 
-MinbarAI listens to the Imam's Khutbah (sermon) in Arabic and displays a live German translation on a screen for the congregation. No delays, no manual work — just spoken Arabic in, German text out.
+MinbarAI listens to the Imam's Khutbah (sermon) in Arabic and displays a live German translation as a desktop overlay for the congregation. No delays, no manual work — just spoken Arabic in, German text out.
 
-Built with a local AI speech recognition model (Whisper) and a translation API, MinbarAI runs entirely on a standard Windows PC with no special hardware required.
+Runs entirely offline and locally on a standard Windows PC. No API keys, no cloud, no subscription.
 
 ---
 
 ## How it works
 
 ```
-Microphone → Whisper (Arabic STT) → Translation API → Live Display Screen
+Microphone → VAD → Whisper (local, Arabic STT) → MyMemory API → PyQt6 Overlay
 ```
 
 1. A microphone captures the Imam's voice
-2. OpenAI's Whisper model transcribes Arabic speech to text locally
-3. The text is sent to a translation API (DeepL / Google Translate)
-4. The German translation appears live on a display screen
+2. Energy-based Voice Activity Detection (VAD) detects sentence boundaries
+3. `faster-whisper` transcribes the Arabic speech to text locally on CPU
+4. The Arabic text is sent to the MyMemory translation API (free, no signup)
+5. The German translation appears live in a transparent desktop overlay
 
 ---
 
@@ -29,24 +30,23 @@ Microphone → Whisper (Arabic STT) → Translation API → Live Display Screen
 
 | Component | Technology |
 |---|---|
-| Speech-to-Text | `faster-whisper` (OpenAI Whisper) |
-| Translation | DeepL API |
-| Audio capture | `sounddevice` / `pyaudio` |
-| Display | Python `tkinter` or browser-based UI |
+| Speech-to-Text | `faster-whisper` (Whisper `tiny` model, runs locally) |
+| Translation | MyMemory API via `requests` (free, no API key) |
+| Audio capture | `sounddevice` |
+| UI | `PyQt6` — transparent always-on-top overlay |
 | Language | Python 3.11+ |
 
 ---
 
 ## Project Status
 
-🚧 Currently in development — Phase 1 (file transcription) in progress.
-
 - [x] Project setup & environment
-- [ ] Phase 1 — Transcribe Arabic audio file
-- [ ] Phase 2 — Translate to German
-- [ ] Phase 3 — Real-time microphone input
-- [ ] Phase 4 — Live display screen
-- [ ] Phase 5 — Mosque deployment
+- [x] Arabic speech-to-text with faster-whisper (local)
+- [x] Arabic → German translation via MyMemory API
+- [x] Real-time microphone input with VAD
+- [x] PyQt6 transparent overlay (always on top, draggable)
+- [x] User controls — opacity, font size (press `S`)
+- [ ] Mosque deployment
 
 ---
 
@@ -54,22 +54,45 @@ Microphone → Whisper (Arabic STT) → Translation API → Live Display Screen
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourname/minbar-ai.git
-cd minbar-ai
+git clone https://github.com/Yacine-DH/MinbarAI.git
+cd MinbarAI
 
 # Create and activate virtual environment
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate   # Windows cmd
+source venv/Scripts/activate  # Git Bash
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
+### Find your microphone device ID
+
+```bash
+python src/list_devices.py
+```
+
+### Run
+
+```bash
+python src/main.py <device_id>
+# Example:
+python src/main.py 4
+```
+
+### Controls
+
+| Key | Action |
+|---|---|
+| `S` | Toggle settings panel (opacity, font size) |
+| `Escape` | Quit |
+| Click + drag | Move the overlay anywhere on screen |
+
 ---
 
 ## Motivation
 
-This project was born out of a real need — helping German-speaking members of a local mosque follow the Friday Khutbah in their language. MinbarAI is a first step toward making mosque services more accessible and inclusive.
+This project was born out of a real need — helping German-speaking members of a local mosque follow the Friday Khutbah in their language. MinbarAI is a step toward making mosque services more accessible and inclusive.
 
 ---
 
