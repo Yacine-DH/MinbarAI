@@ -5,22 +5,40 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QPoint
 from PyQt6.QtGui import QFont
 
+import queue
+import threading
 import audio
-from transcribe import transcribe
-from translate import translate
+import translate as translate_module
+import transcribe as transcribe_module
+
+arabic_queue = queue.Queue()
 
 
-class TranslationWorker(QThread):
-    result = pyqtSignal(str, str)
+class TranscribeWorker(QThread):
+    partial = pyqtSignal(str)
 
     def run(self):
         while True:
             try:
                 chunk = audio.audio_queue.get(timeout=1)
-                arabic = transcribe(chunk)
+                arabic = transcribe_module.transcribe(chunk)
                 if arabic:
-                    german = translate(arabic)
-                    self.result.emit(arabic, german)
+                    self.partial.emit(arabic)
+                    arabic_queue.put(arabic)
+            except Exception:
+                pass
+            self.msleep(10)
+
+
+class TranslateWorker(QThread):
+    result = pyqtSignal(str, str)
+
+    def run(self):
+        while True:
+            try:
+                arabic = arabic_queue.get(timeout=1)
+                german = translate_module.translate(arabic)
+                self.result.emit(arabic, german)
             except Exception:
                 pass
             self.msleep(10)
@@ -60,7 +78,7 @@ class MainWindow(QMainWindow):
         text_layout.setContentsMargins(40, 20, 40, 20)
         text_layout.setSpacing(10)
 
-        self.german_label = QLabel("Warte auf input...")
+        self.german_label = QLabel("Übersetzungsmodell wird geladen...")
         self.german_label.setFont(QFont("Arial", 52))
         self.german_label.setStyleSheet("color: #FFFFFF; background: transparent;")
         self.german_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -136,10 +154,18 @@ class MainWindow(QMainWindow):
 
         self.setWindowOpacity(0.9)
 
+        threading.Thread(target=translate_module.load, daemon=True).start()
+        threading.Thread(target=transcribe_module.load, daemon=True).start()
+
         audio.start(device=device)
-        self.worker = TranslationWorker()
-        self.worker.result.connect(self.update_text)
-        self.worker.start()
+
+        self.transcriber = TranscribeWorker()
+        self.transcriber.partial.connect(self.update_arabic)
+        self.transcriber.start()
+
+        self.translator = TranslateWorker()
+        self.translator.result.connect(self.update_text)
+        self.translator.start()
 
     def _make_slider(self, layout, label: str, min_val: int, max_val: int, default: int) -> QSlider:
         container = QVBoxLayout()
@@ -154,6 +180,9 @@ class MainWindow(QMainWindow):
 
     def update_text(self, arabic: str, german: str):
         self.german_label.setText(german)
+        self.arabic_label.setText(arabic)
+
+    def update_arabic(self, arabic: str):
         self.arabic_label.setText(arabic)
 
     def _reset_hide_timer(self):
