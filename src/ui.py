@@ -7,24 +7,34 @@ from PyQt6.QtGui import QFont
 
 import queue
 import threading
-import audio
-import translate as translate_module
-import transcribe as transcribe_module
+import local_translate as translate_module
+import scribe_realtime
 
 arabic_queue = queue.Queue()
 
 
-class TranscribeWorker(QThread):
+class PartialWorker(QThread):
     partial = pyqtSignal(str)
 
     def run(self):
         while True:
             try:
-                chunk = audio.audio_queue.get(timeout=1)
-                arabic = transcribe_module.transcribe(chunk)
-                if arabic:
-                    self.partial.emit(arabic)
-                    arabic_queue.put(arabic)
+                text = scribe_realtime.partial_queue.get(timeout=1)
+                self.partial.emit(text)
+            except Exception:
+                pass
+            self.msleep(10)
+
+
+class CommittedWorker(QThread):
+    committed = pyqtSignal(str)
+
+    def run(self):
+        while True:
+            try:
+                text = scribe_realtime.committed_queue.get(timeout=1)
+                self.committed.emit(text)
+                arabic_queue.put(text)
             except Exception:
                 pass
             self.msleep(10)
@@ -155,13 +165,16 @@ class MainWindow(QMainWindow):
         self.setWindowOpacity(0.9)
 
         threading.Thread(target=translate_module.load, daemon=True).start()
-        threading.Thread(target=transcribe_module.load, daemon=True).start()
 
-        audio.start(device=device)
+        scribe_realtime.start(device=device)
 
-        self.transcriber = TranscribeWorker()
-        self.transcriber.partial.connect(self.update_arabic)
-        self.transcriber.start()
+        self.partial_worker = PartialWorker()
+        self.partial_worker.partial.connect(self.update_arabic)
+        self.partial_worker.start()
+
+        self.committed_worker = CommittedWorker()
+        self.committed_worker.committed.connect(self.update_arabic)
+        self.committed_worker.start()
 
         self.translator = TranslateWorker()
         self.translator.result.connect(self.update_text)
@@ -209,3 +222,21 @@ class MainWindow(QMainWindow):
 
     def mouseReleaseEvent(self, event):
         self._drag_pos = None
+
+
+if __name__ == "__main__":
+    import sys
+    from PyQt6.QtWidgets import QApplication
+
+    device = None
+    if len(sys.argv) > 1:
+        try:
+            device = int(sys.argv[1])
+        except ValueError:
+            print(f"Invalid device id: {sys.argv[1]}")
+            sys.exit(1)
+
+    app = QApplication(sys.argv)
+    window = MainWindow(device=device)
+    window.show()
+    sys.exit(app.exec())

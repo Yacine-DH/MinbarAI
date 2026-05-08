@@ -8,3 +8,5 @@ torch
 torchaudio
 silero-vad
 sounddevice
+python-dotenv
+elevenlabs

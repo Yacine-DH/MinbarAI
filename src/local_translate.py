@@ -15,7 +15,7 @@ def load():
         print("[translate] loading tokenizer...", flush=True)
         _tokenizer = MarianTokenizer.from_pretrained(_MODEL_NAME)
         print("[translate] loading model...", flush=True)
-        _model = MarianMTModel.from_pretrained(_MODEL_NAME)
+        _model = MarianMTModel.from_pretrained(_MODEL_NAME, use_safetensors=False)
         _model.eval()
         print("[translate] warmup...", flush=True)
         with torch.no_grad():
