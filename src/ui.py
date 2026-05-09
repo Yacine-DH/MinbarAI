@@ -7,34 +7,24 @@ from PyQt6.QtGui import QFont
 
 import queue
 import threading
+import audio
 import local_translate as translate_module
-import scribe_realtime
+import scribe_batch as transcribe_module
 
 arabic_queue = queue.Queue()
 
 
-class PartialWorker(QThread):
+class TranscribeWorker(QThread):
     partial = pyqtSignal(str)
 
     def run(self):
         while True:
             try:
-                text = scribe_realtime.partial_queue.get(timeout=1)
-                self.partial.emit(text)
-            except Exception:
-                pass
-            self.msleep(10)
-
-
-class CommittedWorker(QThread):
-    committed = pyqtSignal(str)
-
-    def run(self):
-        while True:
-            try:
-                text = scribe_realtime.committed_queue.get(timeout=1)
-                self.committed.emit(text)
-                arabic_queue.put(text)
+                chunk = audio.audio_queue.get(timeout=1)
+                arabic = transcribe_module.transcribe(chunk)
+                if arabic:
+                    self.partial.emit(arabic)
+                    arabic_queue.put(arabic)
             except Exception:
                 pass
             self.msleep(10)
@@ -165,16 +155,13 @@ class MainWindow(QMainWindow):
         self.setWindowOpacity(0.9)
 
         threading.Thread(target=translate_module.load, daemon=True).start()
+        threading.Thread(target=transcribe_module.load, daemon=True).start()
 
-        scribe_realtime.start(device=device)
+        audio.start(device=device)
 
-        self.partial_worker = PartialWorker()
-        self.partial_worker.partial.connect(self.update_arabic)
-        self.partial_worker.start()
-
-        self.committed_worker = CommittedWorker()
-        self.committed_worker.committed.connect(self.update_arabic)
-        self.committed_worker.start()
+        self.transcriber = TranscribeWorker()
+        self.transcriber.partial.connect(self.update_arabic)
+        self.transcriber.start()
 
         self.translator = TranslateWorker()
         self.translator.result.connect(self.update_text)

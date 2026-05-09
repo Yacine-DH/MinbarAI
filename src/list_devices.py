@@ -8,13 +8,15 @@ print("Available Audio Input Devices")
 print("=" * 60 + "\n")
 
 devices = sd.query_devices()
+host_apis = sd.query_hostapis()
 
 input_devices = []
 for i, device in enumerate(devices):
     if device['max_input_channels'] > 0:
         input_devices.append((i, device))
         marker = "← DEFAULT" if i == sd.default.device[0] else ""
-        print(f"[{i}] {device['name']}")
+        api_name = host_apis[device['hostapi']]['name']
+        print(f"[{i}] {device['name']}  ({api_name})")
         print(f"    Input channels: {device['max_input_channels']}")
         print(f"    Sample rate: {device['default_samplerate']}")
         print(f"    {marker}\n")
