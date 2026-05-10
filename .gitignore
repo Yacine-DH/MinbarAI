@@ -5,3 +5,4 @@ __pycache__/
 audio_samples/
 settings.json
 .claude/worktrees/
+history.json
