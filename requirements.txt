@@ -10,3 +10,4 @@ silero-vad
 sounddevice
 python-dotenv
 elevenlabs
+google-genai

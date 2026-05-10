@@ -6,13 +6,15 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QSlider, QPushButton, QListWidget, QListWidgetItem
+    QLabel, QSlider, QPushButton, QListWidget, QListWidgetItem,
+    QComboBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QFont, QCursor
 
 import audio
 import local_translate as translate_module
+import gemini_translate
 import scribe_batch as transcribe_module
 
 arabic_queue = queue.Queue()
@@ -21,19 +23,32 @@ HISTORY_PATH = Path(__file__).resolve().parent.parent / "history.json"
 
 
 def load_history():
+    """Returns dict {'khutbas': [...]}. Auto-migrates legacy flat list."""
     if not HISTORY_PATH.exists():
-        return []
+        return {"khutbas": []}
     try:
         with open(HISTORY_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        if isinstance(data, list):
+            if not data:
+                return {"khutbas": []}
+            return {
+                "khutbas": [{
+                    "id": "legacy",
+                    "started_at": data[0].get("ts", ""),
+                    "ended_at": data[-1].get("ts", ""),
+                    "entries": data,
+                }]
+            }
+        return data
     except Exception:
-        return []
+        return {"khutbas": []}
 
 
-def save_history(entries):
+def save_history(history):
     try:
         with open(HISTORY_PATH, "w", encoding="utf-8") as f:
-            json.dump(entries, f, ensure_ascii=False, indent=2)
+            json.dump(history, f, ensure_ascii=False, indent=2)
     except Exception as exc:
         print(f"[history] save failed: {exc}", flush=True)
 
@@ -61,7 +76,14 @@ class TranslateWorker(QThread):
         while True:
             try:
                 arabic = arabic_queue.get(timeout=1)
-                german = translate_module.translate(arabic)
+                german = None
+                if gemini_translate.is_ready():
+                    try:
+                        german = gemini_translate.translate(arabic)
+                    except Exception as exc:
+                        print(f"[translate] gemini failed → Helsinki fallback: {exc}", flush=True)
+                if german is None:
+                    german = translate_module.translate(arabic)
                 self.result.emit(arabic, german)
             except Exception:
                 pass
@@ -69,7 +91,7 @@ class TranslateWorker(QThread):
 
 
 class HistoryWindow(QMainWindow):
-    def __init__(self, entries):
+    def __init__(self, history):
         super().__init__()
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -77,7 +99,7 @@ class HistoryWindow(QMainWindow):
             Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(720, 520)
+        self.resize(760, 560)
         self._drag_pos = None
 
         central = QWidget()
@@ -97,6 +119,15 @@ class HistoryWindow(QMainWindow):
                 border-bottom: 1px solid #333333;
                 padding: 10px 6px;
             }
+            QComboBox {
+                background-color: #2A2A2A; color: #EEEEEE;
+                border: 1px solid #444; border-radius: 4px;
+                padding: 4px 8px; min-height: 22px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2A2A2A; color: #EEEEEE;
+                selection-background-color: #555;
+            }
             QPushButton {
                 background-color: #333333; color: white; border: none;
                 border-radius: 4px; padding: 4px 12px;
@@ -111,12 +142,15 @@ class HistoryWindow(QMainWindow):
         v.setSpacing(8)
 
         header = QHBoxLayout()
-        title = QLabel("History")
+        title = QLabel("Khutba History")
         title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         header.addWidget(title)
         header.addStretch()
-        clear_btn = QPushButton("Clear")
-        clear_btn.clicked.connect(self.clear)
+        del_btn = QPushButton("Delete khutba")
+        del_btn.clicked.connect(self.delete_current)
+        header.addWidget(del_btn)
+        clear_btn = QPushButton("Clear all")
+        clear_btn.clicked.connect(self.clear_all)
         header.addWidget(clear_btn)
         close_btn = QPushButton("✕")
         close_btn.setFixedWidth(32)
@@ -124,29 +158,83 @@ class HistoryWindow(QMainWindow):
         header.addWidget(close_btn)
         v.addLayout(header)
 
-        self.list = QListWidget()
-        v.addWidget(self.list)
+        picker_row = QHBoxLayout()
+        picker_row.addWidget(QLabel("Khutba:"))
+        self.khutba_picker = QComboBox()
+        self.khutba_picker.currentIndexChanged.connect(self._on_khutba_selected)
+        picker_row.addWidget(self.khutba_picker, stretch=1)
+        v.addLayout(picker_row)
 
-        self.entries = entries
+        self.list = QListWidget()
+        v.addWidget(self.list, stretch=1)
+
+        self.history = history
         self.refresh()
 
+    def _khutba_label(self, k):
+        started = k.get("started_at", "?")
+        ended = k.get("ended_at") or "active"
+        n = len(k.get("entries", []))
+        return f"{started}  →  {ended}   ({n} entries)"
+
     def refresh(self):
+        # Preserve selection
+        prev_id = None
+        idx = self.khutba_picker.currentIndex()
+        if idx >= 0 and idx < len(self.history["khutbas"]):
+            # picker is reverse-ordered (newest first)
+            prev_id = list(reversed(self.history["khutbas"]))[idx].get("id")
+
+        self.khutba_picker.blockSignals(True)
+        self.khutba_picker.clear()
+        khutbas_rev = list(reversed(self.history["khutbas"]))
+        for k in khutbas_rev:
+            self.khutba_picker.addItem(self._khutba_label(k))
+        # Restore selection
+        new_idx = 0
+        if prev_id:
+            for i, k in enumerate(khutbas_rev):
+                if k.get("id") == prev_id:
+                    new_idx = i
+                    break
+        self.khutba_picker.setCurrentIndex(new_idx if khutbas_rev else -1)
+        self.khutba_picker.blockSignals(False)
+        self._refresh_entries()
+
+    def _on_khutba_selected(self, _idx):
+        self._refresh_entries()
+
+    def _current_khutba(self):
+        idx = self.khutba_picker.currentIndex()
+        if idx < 0:
+            return None
+        khutbas_rev = list(reversed(self.history["khutbas"]))
+        if idx >= len(khutbas_rev):
+            return None
+        return khutbas_rev[idx]
+
+    def _refresh_entries(self):
         self.list.clear()
-        for e in reversed(self.entries):
+        k = self._current_khutba()
+        if not k:
+            return
+        for e in reversed(k.get("entries", [])):
             ts = e.get("ts", "")
             ar = e.get("ar", "")
             de = e.get("de", "")
-            text = f"[{ts}]\nAR: {ar}\nDE: {de}"
-            item = QListWidgetItem(text)
-            self.list.addItem(item)
+            self.list.addItem(QListWidgetItem(f"[{ts}]\nAR: {ar}\nDE: {de}"))
 
-    def add_entry(self, entry):
-        self.entries.append(entry)
+    def delete_current(self):
+        k = self._current_khutba()
+        if not k:
+            return
+        self.history["khutbas"] = [x for x in self.history["khutbas"] if x is not k]
+        save_history(self.history)
         self.refresh()
 
-    def clear(self):
-        self.entries.clear()
-        save_history(self.entries)
+    def clear_all(self):
+        self.history["khutbas"] = []
+        save_history(self.history)
         self.refresh()
 
     def mousePressEvent(self, event):
@@ -320,12 +408,22 @@ class MainWindow(QMainWindow):
 
         self.setWindowOpacity(0.9)
 
-        # --- History setup ---
+        # --- History + new khutba session ---
         self.history = load_history()
+        now_iso = datetime.now().isoformat(timespec="seconds")
+        self.current_khutba = {
+            "id": now_iso,
+            "started_at": now_iso,
+            "ended_at": None,
+            "entries": [],
+        }
+        self.history["khutbas"].append(self.current_khutba)
+        save_history(self.history)
         self.history_window = HistoryWindow(self.history)
 
         # --- Workers ---
         threading.Thread(target=translate_module.load, daemon=True).start()
+        threading.Thread(target=gemini_translate.load, daemon=True).start()
         threading.Thread(target=transcribe_module.load, daemon=True).start()
 
         audio.start(device=device)
@@ -357,7 +455,7 @@ class MainWindow(QMainWindow):
             "ar": arabic,
             "de": german,
         }
-        self.history.append(entry)
+        self.current_khutba["entries"].append(entry)
         save_history(self.history)
         self.history_window.refresh()
 
@@ -394,6 +492,11 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         from PyQt6.QtWidgets import QApplication
+        try:
+            self.current_khutba["ended_at"] = datetime.now().isoformat(timespec="seconds")
+            save_history(self.history)
+        except Exception:
+            pass
         try:
             self.history_window.close()
         except Exception:
