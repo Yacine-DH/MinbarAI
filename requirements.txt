@@ -11,3 +11,4 @@ sounddevice
 python-dotenv
 elevenlabs
 google-genai
+ollama

@@ -1,4 +1,4 @@
-"""Gemini Flash-Lite Arabic→German translator. Used as primary; Helsinki = fallback."""
+"""Gemini Flash-Lite Arabic→German translator. Available as alt option."""
 import os
 import threading
 
