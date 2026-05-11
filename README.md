@@ -6,47 +6,69 @@
 
 ## What is MinbarAI?
 
-MinbarAI listens to the Imam's Khutbah (sermon) in Arabic and displays a live German translation as a desktop overlay for the congregation. No delays, no manual work — just spoken Arabic in, German text out.
+MinbarAI listens to the Imam's Khutbah (sermon) in Arabic and displays a live German translation as a desktop overlay for the congregation.
 
-Runs entirely offline and locally on a standard Windows PC. No API keys, no cloud, no subscription.
+The current pipeline uses **ElevenLabs Scribe v2** for Arabic transcription (cloud) and **TranslateGemma 4B** running locally via Ollama for translation. **Helsinki-NLP Marian MT** stays bundled as a local fallback when Gemma is unavailable.
 
 ---
 
 ## How it works
 
 ```
-Microphone → VAD → Whisper (local, Arabic STT) → MyMemory API → PyQt6 Overlay
+Microphone → Silero VAD → ElevenLabs Scribe v2 → buffer (punct / 8 words / 0.7s silence)
+                                                    │
+                            ┌───────────────────────┘
+                            ▼
+        TranslateGemma 4B (Ollama, local)  ──fail──►  Helsinki opus-mt-ar-de (local)
+                            │
+                            ▼
+                  PyQt6 overlay (fade transition, 3s minimum display)
+                            │
+                            ▼
+                  Khutba history (JSON, per-session)
 ```
 
-1. A microphone captures the Imam's voice
-2. Energy-based Voice Activity Detection (VAD) detects sentence boundaries
-3. `faster-whisper` transcribes the Arabic speech to text locally on CPU
-4. The Arabic text is sent to the MyMemory translation API (free, no signup)
-5. The German translation appears live in a transparent desktop overlay
+1. Microphone captures Imam's voice (16kHz mono)
+2. Silero VAD detects speech segments based on probability
+3. Each segment is sent to ElevenLabs Scribe v2 for Arabic transcription
+4. Arabic transcripts are buffered until punctuation, 8 words, or 0.7s silence
+5. Buffered Arabic is translated by TranslateGemma 4B (local, via Ollama) — Helsinki MT is the fallback
+6. Each German translation appears in the overlay with a smooth fade transition and stays on screen ≥ 3s
+7. Every transcribed + translated line is saved in `history.json` grouped by Khutba session
 
 ---
 
 ## Tech Stack
 
-| Component | Technology |
-|---|---|
-| Speech-to-Text | `faster-whisper` (Whisper `tiny` model, runs locally) |
-| Translation | MyMemory API via `requests` (free, no API key) |
-| Audio capture | `sounddevice` |
-| UI | `PyQt6` — transparent always-on-top overlay |
-| Language | Python 3.11+ |
+| Component | Technology | Where it runs |
+|---|---|---|
+| Voice activity detection | Silero VAD (PyTorch) | local CPU |
+| Speech-to-Text | ElevenLabs Scribe v2 (`scribe_v2`) | cloud (API key) |
+| Translation (primary) | TranslateGemma 4B (`translategemma:4b`) via Ollama | local |
+| Translation (fallback) | Helsinki-NLP `opus-mt-ar-de` (Marian MT) | local CPU |
+| Audio capture | `sounddevice` | local |
+| UI | `PyQt6` — frameless, transparent, resizable overlay | local |
+| Persistence | JSON file `history.json` (one entry per khutba) | local |
+| Language | Python 3.11+ | — |
 
 ---
 
-## Project Status
+## Project Structure
 
-- [x] Project setup & environment
-- [x] Arabic speech-to-text with faster-whisper (local)
-- [x] Arabic → German translation via MyMemory API
-- [x] Real-time microphone input with VAD
-- [x] PyQt6 transparent overlay (always on top, draggable)
-- [x] User controls — opacity, font size (press `S`)
-- [ ] Mosque deployment
+```
+src/
+├── ui.py                       # entry point
+├── backend/
+│   ├── audio.py                # mic + Silero VAD
+│   ├── scribe_batch.py         # ElevenLabs Scribe v2 STT
+│   ├── gemma_translate.py      # TranslateGemma via Ollama
+│   ├── local_translate.py      # Helsinki Marian MT fallback
+│   ├── history.py              # JSON persistence + khutba schema
+│   └── workers.py              # QThread workers + buffering logic
+└── frontend/
+    ├── main_window.py          # overlay window (display pacing, fade, resize)
+    └── history_window.py       # khutba browser window
+```
 
 ---
 
@@ -59,34 +81,76 @@ cd MinbarAI
 
 # Create and activate virtual environment
 python -m venv venv
-venv\Scripts\activate   # Windows cmd
-source venv/Scripts/activate  # Git Bash
+.\venv\Scripts\Activate.ps1     # PowerShell
+# or:
+venv\Scripts\activate           # Windows cmd
+source venv/Scripts/activate    # Git Bash
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 ```
 
+### Set up Ollama + TranslateGemma
+
+1. Install Ollama from [ollama.com](https://ollama.com/)
+2. Pull the model:
+   ```powershell
+   ollama pull translategemma:4b
+   ```
+3. Ollama runs in the background and exposes its API at `http://localhost:11434`.
+
+### Set up API keys
+
+Create `.env` at the project root:
+
+```
+ELEVENLABS_API_KEY=sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+The `.env` file is already in `.gitignore`.
+
 ### Find your microphone device ID
 
-```bash
+```powershell
 python src/list_devices.py
 ```
 
+Pick a device whose host API is **MME** or **Windows WASAPI** — avoid **Windows WDM-KS** (especially for Bluetooth mics).
+
 ### Run
 
-```bash
-python src/main.py <device_id>
-# Example:
-python src/main.py 4
+```powershell
+python src/ui.py            # default mic
+python src/ui.py 18         # specific device id
 ```
 
 ### Controls
 
-| Key | Action |
+| Key / button | Action |
 |---|---|
-| `S` | Toggle settings panel (opacity, font size) |
-| `Escape` | Quit |
-| Click + drag | Move the overlay anywhere on screen |
+| `S` or ⚙ icon | Toggle settings panel (opacity, font sizes) |
+| `H` or 🕘 icon | Open Khutba history window |
+| `Esc` or ✕ icon | Quit (cleanly closes Ollama session, audio threads) |
+| Click + drag center | Move the overlay |
+| Drag edge / corner | Resize the overlay |
+
+---
+
+## Tunables (in `src/backend/workers.py`)
+
+| Constant | Default | Effect |
+|---|---|---|
+| `MAX_WORDS` | 8 | Max words in buffer before flushing to translator |
+| `SILENCE_TIMEOUT` | 0.7s | Silence between transcripts that triggers flush |
+| `PUNCTUATION` | `. ? ! ؟` | Punctuation that triggers immediate flush |
+| `MIN_GEMMA_INTERVAL` | 0.0s | Rate-limit guard between Gemma calls (local = no throttle needed) |
+
+In `src/frontend/main_window.py`:
+
+| Constant | Default | Effect |
+|---|---|---|
+| `MIN_DISPLAY_MS` | 3000 | Each translation stays on-screen ≥ this many ms before swap |
+| `FADE_MS` | 220 | Fade-out + fade-in duration per swap |
 
 ---
 

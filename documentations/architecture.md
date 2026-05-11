@@ -1,57 +1,97 @@
 # MinbarAI — Architecture (Mermaid)
 
-Bottlenecks shown in **red**. Source: [architecture.mmd](architecture.mmd).
+Cloud calls shown in **amber**, local models in **green**. Source: [architecture.mmd](architecture.mmd).
 
 ```mermaid
 flowchart TD
     Mic([🎤 Imam Microphone<br/>Arabic Khutbah]):::input
 
-    subgraph Capture["Audio Capture (main thread)"]
-        SD[sounddevice InputStream<br/>16kHz mono, 256ms blocks]
-        CB[audio_callback<br/>RMS energy VAD<br/>threshold=0.02]
-        BUF[(speech_buffer<br/>list of np arrays)]
-        SD --> CB --> BUF
+    subgraph Capture["Audio Capture"]
+        SD[sounddevice InputStream<br/>16kHz mono, 512-sample blocks]
+        VAD[Silero VAD<br/>speech prob ≥ 0.5<br/>silence flush 0.8s]:::local
+        SD --> VAD
     end
 
-    DECIDE{End of sentence?<br/>silence ≥ 1.5s<br/>OR len ≥ 15s}
-    BUF --> DECIDE
+    Q1[[audio_queue<br/>queue.Queue]]:::queue
+    VAD -->|speech segment| Q1
 
-    Q[[audio_queue<br/>queue.Queue]]:::queue
-    DECIDE -->|yes: flush| Q
-    DECIDE -->|no| BUF
-
-    subgraph Worker["Background Thread (process_audio)"]
-        WHISPER[WhisperModel<br/>small / int8 / CPU<br/>language=ar]:::bottleneck
-        TXT[Arabic text segments]
-        TRANS[Translator<br/>translate lib<br/>MyMemory API ar→de]:::bottleneck
-        GER[German text]
-        WHISPER --> TXT --> TRANS --> GER
+    subgraph Transcription["TranscribeWorker (QThread)"]
+        SCRIBE[ElevenLabs Scribe v2<br/>scribe_v2 · ara<br/>cloud HTTP]:::cloud
     end
-    Q --> WHISPER
+    Q1 --> SCRIBE
 
-    subgraph Display["Display Layer"]
-        UPD[update_display ar, de]
-        STATE[(in-memory state<br/>+ display.html)]
-        HTTP[HTTP server :8080<br/>meta refresh 2s]:::bottleneck
-        UPD --> STATE --> HTTP
+    Q2[[arabic_queue<br/>queue.Queue]]:::queue
+    SCRIBE -->|Arabic text| Q2
+
+    subgraph Translation["TranslateWorker (QThread)"]
+        BUF[Buffer<br/>flush on:<br/>punct OR ≥8 words OR 0.7s silence]
+        GEMMA[TranslateGemma 4B<br/>Ollama localhost:11434]:::local
+        HELSINKI[Helsinki opus-mt-ar-de<br/>Marian MT, CPU]:::local
+        BUF --> GEMMA
+        GEMMA -.->|fail| HELSINKI
     end
-    GER --> UPD
+    Q2 --> BUF
 
-    Browser([🖥️ Browser / 2nd monitor<br/>Congregation reads German]):::output
-    HTTP --> Browser
+    subgraph Persist["Persistence"]
+        HIST[(history.json<br/>khutbas[])]:::store
+    end
+    GEMMA -->|de| HIST
+    HELSINKI -->|de| HIST
+
+    subgraph UI["MainWindow"]
+        PACE[Display pacing<br/>≥ 3s on screen]
+        FADE[Fade transition<br/>220ms × 2]
+        LBL[arabic_label + german_label]
+        PACE --> FADE --> LBL
+    end
+    GEMMA --> PACE
+    HELSINKI --> PACE
+
+    HISTWIN([🕘 HistoryWindow<br/>khutba browser]):::output
+    HIST --> HISTWIN
+
+    Overlay([🖥️ Transparent overlay<br/>congregation reads German]):::output
+    LBL --> Overlay
 
     classDef input fill:#1e3a8a,stroke:#60a5fa,color:#fff
     classDef output fill:#14532d,stroke:#4ade80,color:#fff
     classDef queue fill:#78350f,stroke:#fbbf24,color:#fff
-    classDef bottleneck fill:#7f1d1d,stroke:#f87171,color:#fff,stroke-width:3px
+    classDef cloud fill:#7c2d12,stroke:#fb923c,color:#fff,stroke-width:3px
+    classDef local fill:#064e3b,stroke:#34d399,color:#fff,stroke-width:2px
+    classDef store fill:#3f3f46,stroke:#a1a1aa,color:#fff
 ```
 
-## Bottleneck breakdown
+## Components
 
-| Node | Why slow | Fix |
+| Layer | Module | Where it runs |
 |---|---|---|
-| WhisperModel | `small` int8 on CPU, 3–8s per sentence | `tiny` model, or GPU+`float16`, or streaming partials |
-| Translator (MyMemory) | network call, not offline, rate-limited | local Marian-NMT `Helsinki-NLP/opus-mt-ar-de` or NLLB-200 |
-| HTTP meta-refresh 2s | client polls every 2s, up to 2s lag | WebSocket / SSE push from server |
+| Audio capture | `backend/audio.py` | local CPU |
+| VAD | Silero VAD (PyTorch) | local CPU |
+| STT | ElevenLabs Scribe v2 | **cloud** |
+| Translation primary | TranslateGemma 4B via Ollama | local |
+| Translation fallback | Helsinki Marian MT | local CPU |
+| Persistence | JSON file | local disk |
+| UI | PyQt6 overlay | local |
 
-Other tunables (not bottlenecks but affect feel): `SILENCE_DURATION=1.5s` adds fixed lag before each translation; `MIN_BUFFER_SIZE=6` prevents short bursts.
+## Cloud vs Local
+
+| Cloud (requires internet + API key) | Local |
+|---|---|
+| ElevenLabs Scribe v2 | Silero VAD |
+| | TranslateGemma 4B (Ollama) |
+| | Helsinki Marian MT |
+
+If Ollama / Gemma is unavailable, Helsinki kicks in automatically. If ElevenLabs fails, transcription stops (no local STT fallback in the current pipeline).
+
+## Threading model
+
+| Thread | Owner | Job |
+|---|---|---|
+| Main (Qt event loop) | `ui.py` | Render, mouse, keyboard, signals |
+| sounddevice callback | OS audio driver | Push raw audio into VAD |
+| VAD worker | `backend/audio.py` | Run Silero, push segments to `audio_queue` |
+| `TranscribeWorker` (QThread) | `backend/workers.py` | Pull from `audio_queue`, call Scribe, push to `arabic_queue` |
+| `TranslateWorker` (QThread) | `backend/workers.py` | Pull from `arabic_queue`, buffer, call Gemma/Helsinki, emit result |
+| Loader threads (3×) | `MainWindow.__init__` | Lazy-load Helsinki, Gemma client, ElevenLabs client at startup |
+
+All signals between QThreads and `MainWindow` are connected via Qt's `pyqtSignal` so updates land on the main thread safely.

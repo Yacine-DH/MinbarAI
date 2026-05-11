@@ -1,14 +1,10 @@
-faster-whisper==1.2.1
 numpy==2.4.3
-requests==2.31.0
 PyQt6
+sounddevice
+torch
+silero-vad
 transformers
 sentencepiece
-torch
-torchaudio
-silero-vad
-sounddevice
 python-dotenv
 elevenlabs
-google-genai
 ollama

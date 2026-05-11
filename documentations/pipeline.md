@@ -9,74 +9,131 @@
        │ analog audio
        ▼
 ┌─────────────────────┐
-│  sounddevice        │  16kHz mono, 256ms blocks
+│  sounddevice        │  16kHz mono, 512-sample blocks (32ms)
 │  InputStream        │
 └──────┬──────────────┘
        │ float32 frames
        ▼
 ┌─────────────────────┐
-│  audio_callback     │  RMS energy calc
-│  (VAD)              │  threshold 0.02
+│  Silero VAD         │  speech probability ≥ 0.5
+│  (snakers4/         │  silence flush ≥ 0.8s
+│   silero-vad)       │  max segment 15s
 └──────┬──────────────┘
-       │ speech chunks
-       ▼
-┌─────────────────────┐
-│  speech_buffer      │  accumulate until:
-│                     │   - 1.5s silence, OR
-│                     │   - 15s max length
-└──────┬──────────────┘
-       │ complete utterance
+       │ speech segments (numpy float32)
        ▼
 ┌─────────────────────┐
 │  audio_queue        │  thread-safe handoff
 │  (queue.Queue)      │
 └──────┬──────────────┘
        │
-       ▼ background thread
+       ▼ TranscribeWorker (QThread)
 ┌─────────────────────┐
-│  WhisperModel       │  ⚠️ BOTTLENECK
-│  small / int8 / cpu │  ~3-8s per chunk
-│  language="ar"      │
+│  ElevenLabs Scribe  │  cloud HTTP API
+│  v2  (model=        │  ~1-3s per segment
+│  scribe_v2,         │  language_code="ara"
+│  language=ara)      │
 └──────┬──────────────┘
-       │ Arabic text
+       │ Arabic transcript
        ▼
 ┌─────────────────────┐
-│  Translator         │  ⚠️ BOTTLENECK
-│  translate lib      │  network call
-│  ar → de            │  MyMemory API
-└──────┬──────────────┘
-       │ German text
-       ▼
-┌─────────────────────┐
-│  update_display()   │  in-mem state
-│                     │  + display.html
+│  arabic_queue       │  thread-safe handoff
 └──────┬──────────────┘
        │
-       ▼
+       ▼ TranslateWorker (QThread)
 ┌─────────────────────┐
-│  HTTP server :8080  │  meta refresh 2s
+│  Buffer             │  Flush triggers:
+│                     │   - punctuation (. ? ! ؟)
+│                     │   - ≥ 8 words
+│                     │   - 0.7s silence (queue empty)
 └──────┬──────────────┘
-       │
+       │ combined Arabic string
        ▼
-┌─────────────────────┐
-│  Browser / screen   │  congregation read
-└─────────────────────┘
+┌─────────────────────┐    fail    ┌─────────────────────┐
+│  TranslateGemma 4B  │───────────►│  Helsinki opus-mt-  │
+│  via Ollama         │            │  ar-de (Marian MT)  │
+│  (local, http://    │            │  local CPU          │
+│   localhost:11434)  │            │                     │
+└──────┬──────────────┘            └──────────┬──────────┘
+       │ German                               │ German
+       └──────────────────┬───────────────────┘
+                          ▼
+              ┌─────────────────────────┐
+              │  result signal          │  Qt signal/slot
+              │  (arabic, german)       │
+              └──────┬──────────────────┘
+                     │
+                     ▼
+              ┌─────────────────────────┐
+              │  history.json           │  append entry
+              │  (current khutba)       │  + save_history()
+              └──────┬──────────────────┘
+                     │
+                     ▼
+              ┌─────────────────────────┐
+              │  MainWindow.update_text │  display pacing:
+              │                         │   - if shown ≥ 3s: swap
+              │                         │   - else: queue pending
+              └──────┬──────────────────┘
+                     │
+                     ▼
+              ┌─────────────────────────┐
+              │  Fade transition        │  220ms fade out
+              │  (QGraphicsOpacity-     │  → setText
+              │   Effect)               │  → 220ms fade in
+              └──────┬──────────────────┘
+                     │
+                     ▼
+              ┌─────────────────────────┐
+              │  PyQt6 overlay          │  frameless, transparent,
+              │  - german_label         │  always-on-top,
+              │  - arabic_label         │  resizable, draggable
+              └─────────────────────────┘
 ```
 
 ## Latency Budget (current)
 
 | Stage | Time | Notes |
 |---|---|---|
-| Mic capture | ~256ms | block size |
-| VAD wait (silence) | 1500ms | `SILENCE_DURATION` |
-| Whisper STT | 3000–8000ms | **CPU bound, biggest cost** |
-| Translation API | 200–800ms | network roundtrip |
-| Display refresh | 0–2000ms | meta-refresh poll |
-| **Total perceived lag** | **~5–12s** | after sentence end |
+| Mic capture | ~32ms | 512-sample block at 16kHz |
+| VAD silence wait | ~800ms | `SILENCE_DURATION` in `audio.py` |
+| Scribe v2 (cloud) | ~1000–2500ms | network roundtrip + transcription |
+| Translation buffer wait | up to ~700ms | until silence trigger or 8 words |
+| TranslateGemma 4B | ~500–2000ms | local CPU/GPU inference |
+| Display pacing lock | 0–3000ms | min display time gate (only delays swap, not data) |
+| Fade transition | 440ms total | 220ms out + 220ms in |
+| **Total perceived lag** | **~3–6s** | after sentence end |
 
-## Optimization Targets
+## Khutba History
 
-1. **Whisper STT** — biggest win. Options: `tiny` model (5x faster, less accurate), GPU/CUDA, `faster-whisper` batched inference, streaming partial results.
-2. **Translation** — local NMT (Marian/NLLB-200) removes network + works offline fully. Currently API-bound.
-3. **Display refresh** — replace 2s meta-refresh with WebSocket/SSE push (instant update).
-4. **VAD silence wait** — `SILENCE_DURATION=1.5s` adds fixed latency. Lower = faster but more cuts mid-sentence.
+- Persistence: `history.json` at project root (gitignored)
+- Schema:
+  ```json
+  {
+    "khutbas": [
+      {
+        "id": "2026-05-10T14:30:00",
+        "started_at": "2026-05-10T14:30:00",
+        "ended_at": "2026-05-10T15:12:48",
+        "entries": [
+          { "ts": "2026-05-10T14:31:22", "ar": "...", "de": "..." }
+        ]
+      }
+    ]
+  }
+  ```
+- New khutba = new app session
+- Auto-migrates legacy flat-list format
+
+## Module map
+
+| Module | Responsibility |
+|---|---|
+| `backend/audio.py` | mic + Silero VAD → `audio_queue` |
+| `backend/scribe_batch.py` | Scribe v2 HTTP API wrapper |
+| `backend/gemma_translate.py` | Ollama HTTP client (TranslateGemma 4B) |
+| `backend/local_translate.py` | Helsinki Marian MT (fallback) |
+| `backend/history.py` | load/save + legacy migration |
+| `backend/workers.py` | `TranscribeWorker`, `TranslateWorker`, buffering |
+| `frontend/main_window.py` | overlay + display pacing + fade + resize |
+| `frontend/history_window.py` | khutba browser (combo box + entry list) |
+| `ui.py` | entry point: `QApplication` + `MainWindow.show()` |
