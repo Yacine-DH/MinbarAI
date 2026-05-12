@@ -36,9 +36,6 @@ python src/ui.py 18         # specific device
 
 # Utilities
 python src/list_devices.py  # list mics + host APIs
-python src/test_gemma.py    # sanity-check Gemma via Ollama
-python src/test_elevenlabs_key.py
-python src/test_scribe_v2.py
 ```
 
 ## Architecture
@@ -119,12 +116,6 @@ A new khutba is appended each app launch. `ended_at` is written on `closeEvent`.
 | Loader threads (3x) | Lazy-load Helsinki, Gemma, ElevenLabs at startup |
 
 Qt signal/slot connections marshal results back onto the main thread.
-
-## Legacy / not in active pipeline
-
-- `src/main.py` — old entry shim, just re-runs `ui.MainWindow`
-- `src/realtime.py`, `display.py`, `scribe_realtime.py` — browser-overlay alternative entry path
-- Test scripts: `test_gemma.py`, `test_scribe_v2.py`, `test_elevenlabs_key.py`, `test_translate.py`, `test_translator.py`
 
 ## Notes for code edits
 

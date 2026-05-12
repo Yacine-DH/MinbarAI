@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
         text_layout.setContentsMargins(40, 20, 40, 20)
         text_layout.setSpacing(10)
 
-        self.german_label = QLabel("Übersetzungsmodell wird geladen...")
+        self.german_label = QLabel("Starting")
         self.german_label.setFont(QFont("Arial", 52))
         self.german_label.setStyleSheet("color: #FFFFFF; background: transparent;")
         self.german_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
         self.arabic_label.setGraphicsEffect(self._ar_opacity)
         self._ar_opacity.setOpacity(1.0)
 
-        self._fade_anims = []  # keep refs alive
+        self._live_anims = set()  # keep refs alive across both label swaps
 
         # --- Controls panel (hidden by default) ---
         self.controls = QWidget()
@@ -269,27 +269,29 @@ class MainWindow(QMainWindow):
 
     def _fade_swap(self, label, effect, new_text):
         """Fade out → set new text → fade in."""
-        fade_out = QPropertyAnimation(effect, b"opacity")
+        fade_out = QPropertyAnimation(effect, b"opacity", label)
         fade_out.setDuration(self.FADE_MS)
         fade_out.setStartValue(effect.opacity())
         fade_out.setEndValue(0.0)
         fade_out.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
-        fade_in = QPropertyAnimation(effect, b"opacity")
+        fade_in = QPropertyAnimation(effect, b"opacity", label)
         fade_in.setDuration(self.FADE_MS)
         fade_in.setStartValue(0.0)
         fade_in.setEndValue(1.0)
         fade_in.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+        self._live_anims.add(fade_out)
+        self._live_anims.add(fade_in)
 
         def on_out_done():
             label.setText(new_text)
             fade_in.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
 
         fade_out.finished.connect(on_out_done)
+        fade_out.finished.connect(lambda: self._live_anims.discard(fade_out))
+        fade_in.finished.connect(lambda: self._live_anims.discard(fade_in))
         fade_out.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
-
-        # Keep refs so GC doesn't kill mid-animation
-        self._fade_anims = [fade_out, fade_in]
 
     def _show_pending(self):
         if self._pending_display:
