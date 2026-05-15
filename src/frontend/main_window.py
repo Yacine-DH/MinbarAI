@@ -74,6 +74,24 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: rgba(80, 80, 80, 200); }
         """
 
+        self._icon_style = icon_style
+        self._mute_style_muted = """
+            QPushButton {
+                background-color: rgba(180, 40, 40, 220);
+                color: #FFFFFF; border: none;
+                border-radius: 14px; min-width: 28px; min-height: 28px;
+                font-size: 14px;
+            }
+            QPushButton:hover { background-color: rgba(220, 60, 60, 240); }
+        """
+
+        self.mute_btn = QPushButton("🎙")
+        self.mute_btn.setToolTip("Mute mic (M)")
+        self.mute_btn.setCheckable(True)
+        self.mute_btn.setStyleSheet(icon_style)
+        self.mute_btn.clicked.connect(self.toggle_mute)
+        top_layout.addWidget(self.mute_btn)
+
         self.history_btn = QPushButton("🕘")
         self.history_btn.setToolTip("History (H)")
         self.history_btn.setStyleSheet(icon_style)
@@ -171,7 +189,7 @@ class MainWindow(QMainWindow):
 
         ctrl_layout.addStretch()
 
-        hint = QLabel("S = settings   H = history   Esc = quit")
+        hint = QLabel("S = settings   H = history   M = mute   Esc = quit")
         hint.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         ctrl_layout.addWidget(hint)
 
@@ -262,8 +280,9 @@ class MainWindow(QMainWindow):
     FADE_MS = 220
 
     def _show_now(self, arabic, german):
+        # Arabic label is driven live by update_arabic — do not overwrite it
+        # here with the older buffered transcript, or it flickers backwards.
         self._fade_swap(self.german_label, self._de_opacity, german)
-        self._fade_swap(self.arabic_label, self._ar_opacity, arabic)
         self._display_unlock_at = int(time.time() * 1000) + self.MIN_DISPLAY_MS
         self._pending_display = None
 
@@ -313,6 +332,18 @@ class MainWindow(QMainWindow):
             self.controls.show()
             self._reset_hide_timer()
 
+    def toggle_mute(self):
+        muted = self.mute_btn.isChecked()
+        audio.set_muted(muted)
+        if muted:
+            self.mute_btn.setText("🔇")
+            self.mute_btn.setToolTip("Unmute mic (M)")
+            self.mute_btn.setStyleSheet(self._mute_style_muted)
+        else:
+            self.mute_btn.setText("🎙")
+            self.mute_btn.setToolTip("Mute mic (M)")
+            self.mute_btn.setStyleSheet(self._icon_style)
+
     def toggle_history(self):
         if self.history_window.isVisible():
             self.history_window.hide()
@@ -327,6 +358,9 @@ class MainWindow(QMainWindow):
             self.toggle_settings()
         elif k == Qt.Key.Key_H:
             self.toggle_history()
+        elif k == Qt.Key.Key_M:
+            self.mute_btn.toggle()
+            self.toggle_mute()
         elif k == Qt.Key.Key_Escape:
             self.close()
 

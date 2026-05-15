@@ -17,6 +17,23 @@ audio_queue = queue.Queue()
 _vad_model = None
 _buffer = []
 _last_speech_time = [None]
+_muted = False
+
+
+def set_muted(value: bool):
+    """When muted, the VAD callback drops incoming audio so nothing reaches
+    Scribe/Gemma — saves tokens while there's noise or no one is speaking."""
+    global _muted
+    _muted = bool(value)
+    if _muted:
+        _buffer.clear()
+        _last_speech_time[0] = None
+        if _vad_model is not None:
+            _vad_model.reset_states()
+
+
+def is_muted() -> bool:
+    return _muted
 
 
 def _load_vad():
@@ -30,7 +47,7 @@ def _load_vad():
 
 
 def _callback(indata, frames, time_info, status):
-    if _vad_model is None:
+    if _vad_model is None or _muted:
         return
 
     audio = indata.copy().flatten().astype(np.float32)
