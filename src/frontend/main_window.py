@@ -5,7 +5,7 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QSlider, QPushButton, QGraphicsOpacityEffect,
+    QLabel, QSlider, QPushButton, QGraphicsOpacityEffect, QComboBox,
 )
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QAbstractAnimation
 from PyQt6.QtGui import QFont, QCursor
@@ -187,6 +187,26 @@ class MainWindow(QMainWindow):
             lambda v: (self.arabic_label.setFont(QFont("Arial", v)), self._reset_hide_timer())
         )
 
+        # --- Scribe model picker ---
+        model_box = QVBoxLayout()
+        model_box.addWidget(QLabel("Scribe model"))
+        self.model_combo = QComboBox()
+        self.model_combo.addItems(list(transcribe_module.AVAILABLE_MODELS))
+        self.model_combo.setCurrentText(transcribe_module.get_model())
+        self.model_combo.setFixedWidth(170)
+        self.model_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #333333; color: white;
+                border: none; border-radius: 4px; padding: 3px 8px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2a2a2a; color: white; selection-background-color: #555555;
+            }
+        """)
+        self.model_combo.currentTextChanged.connect(self._on_model_changed)
+        model_box.addWidget(self.model_combo)
+        ctrl_layout.addLayout(model_box)
+
         ctrl_layout.addStretch()
 
         hint = QLabel("S = settings   H = history   M = mute   Esc = quit")
@@ -331,6 +351,10 @@ class MainWindow(QMainWindow):
         else:
             self.controls.show()
             self._reset_hide_timer()
+
+    def _on_model_changed(self, name):
+        transcribe_module.set_model(name)
+        self._reset_hide_timer()
 
     def toggle_mute(self):
         muted = self.mute_btn.isChecked()

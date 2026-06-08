@@ -12,6 +12,32 @@ load_dotenv()
 
 SAMPLE_RATE = 16000
 
+# Active Scribe model. HTTP convert endpoint accepts:
+#   "scribe_v1"              — legacy, cheapest
+#   "scribe_v1_experimental" — experimental v1 variant
+#   "scribe_v2"              — current default, best accuracy
+# NOTE: "scribe_v2_realtime" is only available on the realtime websocket API,
+# not this HTTP batch endpoint — using it here returns HTTP 400.
+# Override at runtime via SCRIBE_MODEL in .env.
+SCRIBE_MODEL = os.getenv("SCRIBE_MODEL", "scribe_v2")
+
+AVAILABLE_MODELS = ("scribe_v2", "scribe_v1", "scribe_v1_experimental")
+
+
+def set_model(name: str):
+    """Swap the active Scribe model at runtime (UI-driven)."""
+    global SCRIBE_MODEL
+    if name not in AVAILABLE_MODELS:
+        print(f"[scribe_batch] ignoring unknown model: {name!r}", flush=True)
+        return
+    SCRIBE_MODEL = name
+    print(f"[scribe_batch] model switched → {SCRIBE_MODEL}", flush=True)
+
+
+def get_model() -> str:
+    return SCRIBE_MODEL
+
+
 _client = None
 _ready = threading.Event()
 
@@ -24,7 +50,7 @@ def load():
         return
     _client = ElevenLabs(api_key=api_key)
     _ready.set()
-    print("[scribe_batch] ready (model=scribe_v2)", flush=True)
+    print(f"[scribe_batch] ready (model={SCRIBE_MODEL})", flush=True)
 
 
 def transcribe(audio: np.ndarray) -> str:
@@ -43,7 +69,7 @@ def transcribe(audio: np.ndarray) -> str:
     try:
         result = _client.speech_to_text.convert(
             file=buf,
-            model_id="scribe_v2",
+            model_id=SCRIBE_MODEL,
             language_code="ara",
         )
         return (result.text or "").strip()
