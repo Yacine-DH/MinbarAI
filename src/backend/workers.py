@@ -34,7 +34,6 @@ class TranscribeWorker(QThread):
 
 class TranslateWorker(QThread):
     """Buffers Arabic transcripts, flushes when:
-       * Punctuation (. ? ! ؟) detected
        * Silence > SILENCE_TIMEOUT seconds since last received
        * Buffer reaches MAX_WORDS words
 
@@ -43,7 +42,6 @@ class TranslateWorker(QThread):
 
     result = pyqtSignal(str, str)
 
-    PUNCTUATION = set(".?!؟")
     MAX_WORDS = 8
     SILENCE_TIMEOUT = 0.7
     MIN_GEMMA_INTERVAL = 0.0   # local model — no rate limit needed
@@ -62,11 +60,10 @@ class TranslateWorker(QThread):
                     buffer.append(arabic)
                     last_received = time.time()
 
-                    has_punct = any(c in self.PUNCTUATION for c in arabic[-3:])
                     word_count = sum(len(s.split()) for s in buffer)
 
-                    if has_punct or word_count >= self.MAX_WORDS:
-                        print(f"[translate] trigger: punct={has_punct} words={word_count}", flush=True)
+                    if word_count >= self.MAX_WORDS:
+                        print(f"[translate] trigger: words={word_count}", flush=True)
                         self._flush(buffer)
                         buffer = []
                         last_received = None
