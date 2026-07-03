@@ -21,8 +21,8 @@ from backend import postprocess
 
 load_dotenv()
 
-LOCAL_HOST = "http://localhost:11434"
-LOCAL_MODEL = "translategemma:4b"
+LOCAL_HOST = os.getenv("OLLAMA_HOST_URL", "http://localhost:11434")
+LOCAL_MODEL = os.getenv("OLLAMA_MODEL_ID", "translategemma:4b")
 REMOTE_HOST = (os.getenv("REMOTE_OLLAMA_HOST") or "").rstrip("/")
 REMOTE_MODEL = os.getenv("REMOTE_MODEL_ID", "translategemma:12b")
 

@@ -9,6 +9,7 @@ import time
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from backend import audio
+from backend import cloud_translate
 from backend import scribe_batch as transcribe_module
 from backend import gemma_translate
 from backend import postprocess
@@ -97,6 +98,24 @@ class TranslateWorker(QThread):
             return
 
         print(f"[translate] flushing: {combined[:60]!r}...", flush=True)
+
+        # cloud mode: server runs matcher + MT + rerank; client only dedupes
+        # verse continuations. Falls through to the local stack on failure.
+        if cloud_translate.is_ready():
+            try:
+                res = cloud_translate.translate(combined, context_ref=self._last_verse_ref)
+                german, ref = res.get("german", ""), res.get("ref", "")
+                if german:
+                    if ref and self._last_verse_ref and quran_match.refs_overlap(ref, self._last_verse_ref):
+                        print(f"[translate] cloud: {ref} continues — skip", flush=True)
+                        self._last_verse_ref = ref
+                        return
+                    self._last_verse_ref = ref or None
+                    print(f"[translate] cloud OK [{res.get('source')}] → {german[:60]!r}", flush=True)
+                    self.result.emit(combined, german, ref)
+                    return
+            except Exception as exc:
+                print(f"[translate] cloud failed → local stack: {exc}", flush=True)
 
         # Quran quotation? serve the canonical Bubenheim translation
         if quran_match.is_ready():

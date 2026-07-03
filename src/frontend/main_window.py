@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QAbstract
 from PyQt6.QtGui import QFont, QCursor
 
 from backend import audio
+from backend import cloud_translate
 from backend import gemma_translate
 from backend import quran_match
 from backend import rerank
@@ -274,6 +275,7 @@ class MainWindow(QMainWindow):
         threading.Thread(target=transcribe_module.load, daemon=True).start()
         threading.Thread(target=quran_match.load, daemon=True).start()
         threading.Thread(target=rerank.load, daemon=True).start()
+        threading.Thread(target=cloud_translate.load, daemon=True).start()
 
         audio.start(device=self._start_device)
 
