@@ -209,6 +209,24 @@ class MainWindow(QMainWindow):
         model_box.addWidget(self.model_combo)
         ctrl_layout.addLayout(model_box)
 
+        # --- Microphone picker ---
+        mic_box = QVBoxLayout()
+        mic_box.addWidget(QLabel("Microphone"))
+        self.mic_combo = QComboBox()
+        self.mic_combo.setFixedWidth(200)
+        self.mic_combo.setStyleSheet(self.model_combo.styleSheet())
+        self._mic_devices = audio.list_input_devices()
+        for dev_idx, name in self._mic_devices:
+            self.mic_combo.addItem(name, dev_idx)
+        start_device = device if device is not None else audio.default_input_index()
+        pos = next((i for i, (d, _) in enumerate(self._mic_devices) if d == start_device), -1)
+        if pos >= 0:
+            self.mic_combo.setCurrentIndex(pos)
+        self._start_device = start_device
+        self.mic_combo.currentIndexChanged.connect(self._on_mic_changed)
+        mic_box.addWidget(self.mic_combo)
+        ctrl_layout.addLayout(mic_box)
+
         ctrl_layout.addStretch()
 
         hint = QLabel("S = settings   H = history   M = mute   Esc = quit")
@@ -257,7 +275,7 @@ class MainWindow(QMainWindow):
         threading.Thread(target=quran_match.load, daemon=True).start()
         threading.Thread(target=rerank.load, daemon=True).start()
 
-        audio.start(device=device)
+        audio.start(device=self._start_device)
 
         # --- Workers ---
         self.transcriber = TranscribeWorker()
@@ -280,16 +298,28 @@ class MainWindow(QMainWindow):
         return slider
 
     # --- Slot: receive translation result ---
-    def update_text(self, arabic, german):
+    def update_text(self, arabic, german, quran_ref=""):
         # Persist + history (always immediate, no pacing)
         entry = {
             "ts": datetime.now().isoformat(timespec="seconds"),
             "ar": arabic,
             "de": german,
         }
+        if quran_ref:
+            entry["quran"] = quran_ref
         self.current_khutba["entries"].append(entry)
         save_history(self.history)
         self.history_window.refresh()
+
+        if quran_ref:
+            # recited verse: show the complete canonical translation with its
+            # sura:verse reference, styled apart from normal speech
+            label = quran_match.ref_label(quran_ref)
+            german = (
+                f'<span style="color:#D8C9A3;">{german}</span>'
+                f'<br><span style="font-size:18px; color:#8FBF9F;">'
+                f'&#128214; {label}</span>'
+            )
 
         # Display pacing: ensure shown >= MIN_DISPLAY_MS before swap
         now_ms = int(time.time() * 1000)
@@ -355,6 +385,20 @@ class MainWindow(QMainWindow):
         else:
             self.controls.show()
             self._reset_hide_timer()
+
+    def _on_mic_changed(self, index):
+        dev = self.mic_combo.itemData(index)
+        if dev is None:
+            return
+        if not audio.switch_device(dev):
+            # reopen failed — snap the combo back to the device actually in use
+            actual = audio.current_device()
+            pos = next((i for i, (d, _) in enumerate(self._mic_devices) if d == actual), -1)
+            if pos >= 0:
+                self.mic_combo.blockSignals(True)
+                self.mic_combo.setCurrentIndex(pos)
+                self.mic_combo.blockSignals(False)
+        self._reset_hide_timer()
 
     def _on_model_changed(self, name):
         transcribe_module.set_model(name)

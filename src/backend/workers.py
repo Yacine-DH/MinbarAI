@@ -26,6 +26,8 @@ class TranscribeWorker(QThread):
         while True:
             try:
                 chunk = audio.audio_queue.get(timeout=1)
+                if len(chunk) < audio.SAMPLE_RATE // 2:
+                    continue  # <0.5s: Scribe rejects with audio_too_short
                 arabic = transcribe_module.transcribe(chunk)
                 if arabic:
                     self.partial.emit(arabic)
@@ -43,7 +45,7 @@ class TranslateWorker(QThread):
     Translation chain: Gemma (local Ollama) -> Helsinki (local fallback).
     """
 
-    result = pyqtSignal(str, str)
+    result = pyqtSignal(str, str, str)  # (arabic, german, quran ref or "")
 
     MAX_WORDS = 8
     SILENCE_TIMEOUT = 0.7
@@ -107,7 +109,7 @@ class TranslateWorker(QThread):
                     return
                 print(f"[translate] quran match {m.ref} (score={m.score:.0f})", flush=True)
                 self._last_verse_ref = m.ref
-                self.result.emit(combined, m.german)
+                self.result.emit(combined, m.german, m.ref)
                 return
         self._last_verse_ref = None
 
@@ -146,4 +148,4 @@ class TranslateWorker(QThread):
             label, german = candidates[0]
 
         print("[translate] emitting result", flush=True)
-        self.result.emit(combined, german)
+        self.result.emit(combined, german, "")
