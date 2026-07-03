@@ -2,6 +2,8 @@ import threading
 import torch
 from transformers import MarianMTModel, MarianTokenizer
 
+from backend import postprocess
+
 _MODEL_NAME = "Helsinki-NLP/opus-mt-ar-de"
 _tokenizer = None
 _model = None
@@ -29,6 +31,10 @@ def load():
         traceback.print_exc()
 
 
+def is_ready() -> bool:
+    return _ready.is_set()
+
+
 def translate(text: str) -> str:
     _ready.wait()
     with _lock:
@@ -43,4 +49,6 @@ def translate(text: str) -> str:
                 max_length=128,
                 do_sample=False,
             )
-            return _tokenizer.decode(outputs[0], skip_special_tokens=True)
+            return postprocess.clean(
+                _tokenizer.decode(outputs[0], skip_special_tokens=True)
+            )

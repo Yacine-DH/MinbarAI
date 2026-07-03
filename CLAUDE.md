@@ -40,7 +40,12 @@ python src/list_devices.py  # list mics + host APIs
 
 ## Architecture
 
-Pipeline: **Mic → Silero VAD → Scribe v2 (cloud) → Buffer → TranslateGemma 4B (local Ollama) → Helsinki MT (fallback) → PyQt6 overlay**
+Pipeline: **Mic → Silero VAD → Scribe v2 (cloud) → Buffer → Quran verse matcher → [TranslateGemma (remote 12B → local 4B) + Helsinki MT candidates → QE rerank] → postprocess → PyQt6 overlay**
+
+Recited Quran verses bypass MT entirely: `quran_match.py` fuzzy-matches the
+transcript against all 6236 verses and serves the canonical Bubenheim & Elyas
+German. Everything else is translated by both MT engines; a cross-lingual
+embedding reranker picks the better candidate.
 
 ```
 src/
@@ -48,14 +53,35 @@ src/
 ├── backend/
 │   ├── audio.py                # sounddevice + Silero VAD → audio_queue
 │   ├── scribe_batch.py         # ElevenLabs Scribe v2 HTTP wrapper
-│   ├── gemma_translate.py      # Ollama HTTP client (translategemma:4b)
-│   ├── local_translate.py      # Helsinki opus-mt-ar-de (Marian MT) fallback
+│   ├── gemma_translate.py      # Ollama client, ordered endpoints: remote 12B tunnel → local 4B
+│   ├── local_translate.py      # Helsinki opus-mt-ar-de (Marian MT) second candidate
+│   ├── quran_match.py          # verse matcher → canonical Bubenheim German (data/*.json)
+│   ├── rerank.py               # cross-lingual QE: picks best MT candidate (MiniLM)
+│   ├── postprocess.py          # Gott→Allah, Bote→Gesandter, language-leak guard
 │   ├── history.py              # JSON persistence with khutba sessions
 │   └── workers.py              # TranscribeWorker + TranslateWorker QThreads + buffering
 └── frontend/
     ├── main_window.py          # overlay window (display pacing, fade, edge-resize)
     └── history_window.py       # khutba browser (combo box + entries list)
 ```
+
+Remote GPU boost (optional): run `notebooks/remote_ollama.ipynb` on
+Colab/Kaggle (T4, internet on), copy the printed `REMOTE_OLLAMA_HOST=...`
+line into `.env`. Health-checked every 30 s; dead tunnel falls back to
+local 4B automatically. Optional `.env` keys: `REMOTE_OLLAMA_HOST`,
+`REMOTE_MODEL_ID` (default `translategemma:12b`).
+
+## Accuracy evaluation
+
+```powershell
+python tests\eval_translation.py            # full pipeline (matcher + MT + rerank)
+python tests\eval_translation.py --no-matcher --tag baseline
+python -m pytest tests\test_quran_match.py -q
+```
+47 cases, metric = MiniLM cosine vs reference German. History appended to
+`tests/eval_results.json`. Current: **0.950 overall** (Quran 1.0, khutbah
+0.88). Research notes: `docs/translation_research.md`. Quran data files in
+`data/` come from fawazahmed0/quran-api (jsDelivr CDN).
 
 ## Key constants
 

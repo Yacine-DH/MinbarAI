@@ -8,3 +8,6 @@ sentencepiece
 python-dotenv
 elevenlabs
 ollama
+rapidfuzz
+sentence-transformers
+sacrebleu

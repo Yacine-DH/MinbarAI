@@ -12,6 +12,8 @@ from PyQt6.QtGui import QFont, QCursor
 
 from backend import audio
 from backend import gemma_translate
+from backend import quran_match
+from backend import rerank
 from backend import local_translate as translate_module
 from backend import scribe_batch as transcribe_module
 from backend.history import load_history, save_history
@@ -252,6 +254,8 @@ class MainWindow(QMainWindow):
         threading.Thread(target=translate_module.load, daemon=True).start()
         threading.Thread(target=gemma_translate.load, daemon=True).start()
         threading.Thread(target=transcribe_module.load, daemon=True).start()
+        threading.Thread(target=quran_match.load, daemon=True).start()
+        threading.Thread(target=rerank.load, daemon=True).start()
 
         audio.start(device=device)
 
