@@ -4,3 +4,6 @@ __pycache__/
 .env
 audio_samples/
 settings.json
+.claude/worktrees/
+history.json
+.claude/settings.local.json

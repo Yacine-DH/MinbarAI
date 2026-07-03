@@ -1,0 +1,59 @@
+%% MinbarAI system architecture - Mermaid diagram
+%% Render: https://mermaid.live  or VS Code Mermaid preview
+
+flowchart TD
+    Mic([🎤 Imam Microphone<br/>Arabic Khutbah]):::input
+
+    subgraph Capture["Audio Capture"]
+        SD[sounddevice InputStream<br/>16kHz mono, 512-sample blocks]
+        VAD[Silero VAD<br/>speech prob ≥ 0.5<br/>silence flush 0.8s]:::local
+        SD --> VAD
+    end
+
+    Q1[[audio_queue<br/>queue.Queue]]:::queue
+    VAD -->|speech segment| Q1
+
+    subgraph Transcription["TranscribeWorker (QThread)"]
+        SCRIBE[ElevenLabs Scribe v2<br/>scribe_v2 · ara<br/>cloud HTTP]:::cloud
+    end
+    Q1 --> SCRIBE
+
+    Q2[[arabic_queue<br/>queue.Queue]]:::queue
+    SCRIBE -->|Arabic text| Q2
+
+    subgraph Translation["TranslateWorker (QThread)"]
+        BUF[Buffer<br/>flush on:<br/>punct OR ≥8 words OR 0.7s silence]
+        GEMMA[TranslateGemma 4B<br/>Ollama localhost:11434]:::local
+        HELSINKI[Helsinki opus-mt-ar-de<br/>Marian MT, CPU]:::local
+        BUF --> GEMMA
+        GEMMA -.->|fail| HELSINKI
+    end
+    Q2 --> BUF
+
+    subgraph Persist["Persistence"]
+        HIST[(history.json<br/>khutbas[])]:::store
+    end
+    GEMMA -->|de| HIST
+    HELSINKI -->|de| HIST
+
+    subgraph UI["MainWindow"]
+        PACE[Display pacing<br/>≥ 3s on screen]
+        FADE[Fade transition<br/>220ms × 2]
+        LBL[arabic_label + german_label]
+        PACE --> FADE --> LBL
+    end
+    GEMMA --> PACE
+    HELSINKI --> PACE
+
+    HISTWIN([🕘 HistoryWindow<br/>khutba browser]):::output
+    HIST --> HISTWIN
+
+    Overlay([🖥️ Transparent overlay<br/>congregation reads German]):::output
+    LBL --> Overlay
+
+    classDef input fill:#1e3a8a,stroke:#60a5fa,color:#fff
+    classDef output fill:#14532d,stroke:#4ade80,color:#fff
+    classDef queue fill:#78350f,stroke:#fbbf24,color:#fff
+    classDef cloud fill:#7c2d12,stroke:#fb923c,color:#fff,stroke-width:3px
+    classDef local fill:#064e3b,stroke:#34d399,color:#fff,stroke-width:2px
+    classDef store fill:#3f3f46,stroke:#a1a1aa,color:#fff
