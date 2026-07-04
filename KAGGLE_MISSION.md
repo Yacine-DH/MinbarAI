@@ -28,10 +28,17 @@ Mic → Silero VAD → ElevenLabs Scribe v2 (cloud ASR) → text buffer
 
 **This branch is cloud-only: the mosque PC runs NO models** — just mic, VAD,
 Scribe calls, and the overlay. Every chunk goes to the FastAPI server
-(`server/app.py`, deployed via `notebooks/cloud_server.ipynb`,
-`TRANSLATE_SERVER_URL` in the client's `.env`). If the server is down, the
-overlay shows the live Arabic transcript only — there is no local fallback,
-so server reliability and pre-warming matter.
+(`server/app.py`). If the server is down, the overlay shows the live Arabic
+transcript only — there is no local fallback.
+
+**Serving runs on Modal** (`server/modal_app.py`, permanent URL
+`https://yacine-dh--minbarai-translate-translator-api.modal.run`,
+scale-to-zero, model cached in the `minbarai-ollama` volume, deployed with
+`modal deploy server/modal_app.py` from the owner's machine).
+**Your Kaggle session is the training factory only** — you do not need to
+serve from Kaggle; `notebooks/cloud_server.ipynb` exists as a backup serving
+path. When the fine-tuned 12B GGUF is on HF, the owner redeploys Modal with
+`OLLAMA_MODEL_ID` pointed at it.
 
 ## Accuracy state (do not regress)
 
