@@ -151,14 +151,28 @@ def translate_helsinki(text):
     return local_translate.translate(text)
 
 
-def run(cases, use_matcher, engine):
-    if use_matcher:
+def translate_server(url, text, context_ref=None):
+    import json as _json
+    import urllib.request
+    body = _json.dumps({"text": text, "context_ref": context_ref}).encode()
+    req = urllib.request.Request(f"{url}/translate", data=body,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return _json.load(resp)
+
+
+def run(cases, use_matcher, engine, server=None):
+    if use_matcher and not server:
         quran_match.load()
     outputs = []
     for c in cases:
         t0 = time.time()
         src, out = "mt", None
-        if use_matcher:
+        if server:
+            res = translate_server(server, c["ar"], c.get("context_ref"))
+            out = res.get("german", "")
+            src = f"server:{res.get('source')}" + (f"({res['ref']})" if res.get("ref") else "")
+        elif use_matcher:
             m = quran_match.match(c["ar"], context_ref=c.get("context_ref"))
             if m:
                 out, src = m.german, f"quran({m.ref},{m.score:.0f})"
@@ -208,15 +222,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-matcher", action="store_true")
     ap.add_argument("--helsinki", action="store_true")
+    ap.add_argument("--server", default=None, help="translate via server URL (cloud pipeline)")
     ap.add_argument("--tag", default=None, help="label stored in results file")
     args = ap.parse_args()
 
     cases = build_cases()
     engine = "helsinki" if args.helsinki else "gemma"
     use_matcher = not args.no_matcher
-    tag = args.tag or f"{engine}{'+matcher' if use_matcher else ''}"
+    tag = args.tag or ("server" if args.server else f"{engine}{'+matcher' if use_matcher else ''}")
     print(f"Running eval: {tag} ({len(cases)} cases)")
-    outputs = run(cases, use_matcher, engine)
+    outputs = run(cases, use_matcher, engine, server=args.server)
     overall = score(outputs)
 
     hist = []

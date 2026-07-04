@@ -57,7 +57,7 @@ image = (
         "MarianTokenizer.from_pretrained('Helsinki-NLP/opus-mt-ar-de'); "
         "MarianMTModel.from_pretrained('Helsinki-NLP/opus-mt-ar-de', use_safetensors=False)\"",
     )
-    .env({"OLLAMA_MODEL_ID": MODEL_ID, "OLLAMA_KEEP_ALIVE": "-1"})
+    .env({"OLLAMA_MODEL_ID": MODEL_ID, "OLLAMA_KEEP_ALIVE": "-1", "GEMMA_TIMEOUT": "45"})
     # project code + Quran data, laid out exactly like the repo so the
     # relative paths inside server/app.py and quran_match.py keep working
     .add_local_dir("src", remote_path="/root/minbarai/src")
@@ -91,6 +91,14 @@ class Translator:
             print(f"[modal] pulling {MODEL_ID} into volume (one-time)...", flush=True)
             subprocess.run(["ollama", "pull", MODEL_ID], check=True)
             ollama_volume.commit()
+        # load weights into the GPU now so the first chunk isn't slow and
+        # gemma never times out against the fast Helsinki candidate
+        print("[modal] warming model...", flush=True)
+        subprocess.run(
+            ["ollama", "run", MODEL_ID, "Translate to German: مرحبا"],
+            capture_output=True, timeout=300,
+        )
+        print("[modal] warm.", flush=True)
 
     @modal.asgi_app()
     def api(self):

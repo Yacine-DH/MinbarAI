@@ -27,7 +27,7 @@ REMOTE_HOST = (os.getenv("REMOTE_OLLAMA_HOST") or "").rstrip("/")
 REMOTE_MODEL = os.getenv("REMOTE_MODEL_ID", "translategemma:12b")
 
 HEALTH_INTERVAL = 30.0   # seconds between endpoint health checks
-REQUEST_TIMEOUT = 20.0   # per-call timeout (remote tunnels can hang)
+REQUEST_TIMEOUT = float(os.getenv("GEMMA_TIMEOUT", "20"))  # per-call timeout
 
 PROMPT_TEMPLATE = (
     "You are a professional Arabic (ar) to German (de-DE) translator. "
@@ -128,7 +128,9 @@ def translate(text: str) -> str:
             response = ep.client.chat(
                 model=ep.model,
                 messages=[{"role": "user", "content": prompt}],
-                options={"temperature": 0.0, "num_predict": 512},
+                # short ctx + output cap: chunks are <20 words, translations
+                # short — keeps KV cache tiny and stops runaway generations
+                options={"temperature": 0.0, "num_predict": 192, "num_ctx": 2048},
             )
             msg = getattr(response, "message", None)
             if msg is None and isinstance(response, dict):
