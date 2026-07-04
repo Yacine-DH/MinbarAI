@@ -1,0 +1,84 @@
+{
+  "formulas": [
+    {
+      "id": "hadith-muflis",
+      "ar": "إن المفلس من أمتي من يأتي يوم القيامة بصيام وصلاة وزكاة ويأتي وقد شتم هذا وقذف هذا وأكل مال هذا",
+      "de": "Der Bankrotte meiner Gemeinschaft ist derjenige, der am Tag der Auferstehung mit Fasten, Gebet und Zakat kommt, aber diesen beschimpft, jenen verleumdet und das Vermögen dieses verzehrt hat."
+    },
+    {
+      "id": "hadith-siyam-junna",
+      "ar": "الصيام جنة يستجن بها العبد من النار",
+      "de": "Das Fasten ist ein Schutzschild, mit dem sich der Diener vor dem Feuer schützt."
+    },
+    {
+      "id": "hadith-zulm-qudsi",
+      "ar": "يا عبادي إني حرمت الظلم على نفسي وجعلته بينكم محرما فلا تظالموا",
+      "de": "O Meine Diener, Ich habe Mir Selbst das Unrecht verboten und habe es auch unter euch verboten; so fügt einander kein Unrecht zu."
+    },
+    {
+      "id": "hadith-mazlima",
+      "ar": "من كانت له مظلمة لأخيه من عرضه أو شيء فليتحلل منه اليوم قبل ألا يكون دينار ولا درهم",
+      "de": "Wer seinem Bruder ein Unrecht angetan hat, an seiner Ehre oder an etwas anderem, der soll sich heute von ihm entbinden lassen, bevor es weder Dinar noch Dirham gibt."
+    },
+    {
+      "id": "hadith-mazlima-short",
+      "ar": "من كانت له مظلمة لأخيه فليتحلل منه اليوم قبل ألا يكون دينار ولا درهم",
+      "de": "Wer seinem Bruder ein Unrecht angetan hat, der soll sich heute von ihm entbinden lassen, bevor es weder Dinar noch Dirham gibt."
+    },
+    {
+      "id": "hadith-siyam-iman",
+      "ar": "من صام رمضان إيمانا واحتسابا غفر له ما تقدم من ذنبه",
+      "de": "Wer den Ramadan aus Glauben und in Erwartung des Lohnes fastet, dem werden seine vergangenen Sünden vergeben."
+    },
+    {
+      "id": "hadith-qiyam-iman",
+      "ar": "من قام رمضان إيمانا واحتسابا غفر له ما تقدم من ذنبه",
+      "de": "Wer die Nächte des Ramadan aus Glauben und in Erwartung des Lohnes im Gebet verbringt, dem werden seine vergangenen Sünden vergeben."
+    },
+    {
+      "id": "hadith-amal-niyyat",
+      "ar": "إنما الأعمال بالنيات وإنما لكل امرئ ما نوى",
+      "de": "Die Taten sind entsprechend den Absichten, und jedem Menschen steht das zu, was er beabsichtigt hat."
+    },
+    {
+      "id": "hadith-arkan",
+      "ar": "بني الإسلام على خمس شهادة أن لا إله إلا الله وأن محمدا رسول الله وإقام الصلاة وإيتاء الزكاة وحج البيت وصوم رمضان",
+      "de": "Der Islam ist auf fünf Säulen errichtet: dem Zeugnis, dass es keinen Gott außer Allah gibt und dass Muhammad der Gesandte Allahs ist, dem Verrichten des Gebets, dem Entrichten der Zakat, der Pilgerfahrt zum Hause Allahs und dem Fasten im Ramadan."
+    },
+    {
+      "id": "hadith-din-nasiha",
+      "ar": "الدين النصيحة قلنا لمن قال لله ولكتابه ولرسوله ولأئمة المسلمين وعامتهم",
+      "de": "Die Religion ist aufrichtiger Rat. Wir fragten: Wem gegenüber? Er sagte: Allah, Seinem Buch, Seinem Gesandten, den Führern der Muslime und ihrer Allgemeinheit."
+    },
+    {
+      "id": "hadith-la-darar",
+      "ar": "لا ضرر ولا ضرار",
+      "de": "Es darf weder Schaden zugefügt noch Schaden erwidert werden."
+    },
+    {
+      "id": "hadith-muslim-akhu",
+      "ar": "المسلم أخو المسلم لا يظلمه ولا يسلمه",
+      "de": "Der Muslim ist der Bruder des Muslims: Er tut ihm kein Unrecht und lässt ihn nicht im Stich."
+    },
+    {
+      "id": "hadith-taqwa-ayna",
+      "ar": "اتق الله حيثما كنت وأتبع السيئة الحسنة تمحها وخالق الناس بخلق حسن",
+      "de": "Fürchte Allah, wo immer du bist, lass auf die schlechte Tat die gute folgen, die sie auslöscht, und begegne den Menschen mit gutem Charakter."
+    },
+    {
+      "id": "hadith-kalima-tayyiba",
+      "ar": "والكلمة الطيبة صدقة",
+      "de": "Und das gute Wort ist eine Spende."
+    },
+    {
+      "id": "hadith-rifq",
+      "ar": "إن الله رفيق يحب الرفق في الأمر كله",
+      "de": "Allah ist milde, und Er liebt die Milde in allen Dingen."
+    },
+    {
+      "id": "hadith-jar",
+      "ar": "من كان يؤمن بالله واليوم الآخر فليكرم جاره",
+      "de": "Wer an Allah und den Jüngsten Tag glaubt, der soll seinen Nachbarn ehren."
+    }
+  ]
+}

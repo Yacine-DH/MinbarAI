@@ -70,6 +70,7 @@ image = (
     image=image,
     gpu="T4",
     volumes={"/root/.ollama": ollama_volume},
+    secrets=[modal.Secret.from_name("minbarai-gemini")],  # rescue engine
     scaledown_window=600,   # stay warm 10 min after the last chunk
     timeout=900,
 )

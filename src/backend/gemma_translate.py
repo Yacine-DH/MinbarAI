@@ -39,6 +39,17 @@ PROMPT_TEMPLATE = (
     "{text}"
 )
 
+# retry template for inputs the strict template refuses: classical rhymed
+# prose (saj'), hadith fragments, incomplete phrases from the ASR buffer
+ROBUST_TEMPLATE = (
+    "You are a professional Arabic (ar) to German (de-DE) translator "
+    "working on a live mosque sermon (khutbah). The input may be a "
+    "fragment, rhymed classical prose, a hadith, or an incomplete phrase — "
+    "translate it into German as faithfully as possible anyway. Never "
+    "refuse, never explain; output only the German translation.\n\n\n"
+    "{text}"
+)
+
 
 class _Endpoint:
     def __init__(self, name, host, model):
@@ -116,10 +127,11 @@ def active_endpoint() -> str:
     return "none"
 
 
-def translate(text: str) -> str:
+def translate(text: str, temperature: float = 0.0, robust: bool = False) -> str:
     if not _ready.is_set():
         raise RuntimeError("gemma not ready")
-    prompt = PROMPT_TEMPLATE.format(text=text)
+    template = ROBUST_TEMPLATE if robust else PROMPT_TEMPLATE
+    prompt = template.format(text=text)
     last_exc = None
     for ep in _endpoints:
         if not ep.alive:
@@ -130,7 +142,7 @@ def translate(text: str) -> str:
                 messages=[{"role": "user", "content": prompt}],
                 # short ctx + output cap: chunks are <20 words, translations
                 # short — keeps KV cache tiny and stops runaway generations
-                options={"temperature": 0.0, "num_predict": 192, "num_ctx": 2048},
+                options={"temperature": temperature, "num_predict": 192, "num_ctx": 2048},
             )
             msg = getattr(response, "message", None)
             if msg is None and isinstance(response, dict):
