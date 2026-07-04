@@ -12,10 +12,7 @@ from PyQt6.QtGui import QFont, QCursor
 
 from backend import audio
 from backend import cloud_translate
-from backend import gemma_translate
-from backend import quran_match
-from backend import rerank
-from backend import local_translate as translate_module
+from backend import quran_match  # ref_label only — no data load client-side
 from backend import scribe_batch as transcribe_module
 from backend.history import load_history, save_history
 from backend.workers import TranscribeWorker, TranslateWorker
@@ -269,12 +266,8 @@ class MainWindow(QMainWindow):
         save_history(self.history)
         self.history_window = HistoryWindow(self.history)
 
-        # --- Background loaders ---
-        threading.Thread(target=translate_module.load, daemon=True).start()
-        threading.Thread(target=gemma_translate.load, daemon=True).start()
+        # --- Background loaders (cloud-only: no models on this machine) ---
         threading.Thread(target=transcribe_module.load, daemon=True).start()
-        threading.Thread(target=quran_match.load, daemon=True).start()
-        threading.Thread(target=rerank.load, daemon=True).start()
         threading.Thread(target=cloud_translate.load, daemon=True).start()
 
         audio.start(device=self._start_device)

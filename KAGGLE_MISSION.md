@@ -26,11 +26,12 @@ Mic → Silero VAD → ElevenLabs Scribe v2 (cloud ASR) → text buffer
   → PyQt6 overlay
 ```
 
-Two server deployment modes already exist on this branch:
-- `notebooks/remote_ollama.ipynb` — bare Ollama 12B + tunnel (`REMOTE_OLLAMA_HOST`)
-- `notebooks/cloud_server.ipynb` + `server/app.py` — full FastAPI stack
-  (matcher + MT + rerank server-side, `TRANSLATE_SERVER_URL`), thin client on
-  the mosque PC. **This is the preferred mode.**
+**This branch is cloud-only: the mosque PC runs NO models** — just mic, VAD,
+Scribe calls, and the overlay. Every chunk goes to the FastAPI server
+(`server/app.py`, deployed via `notebooks/cloud_server.ipynb`,
+`TRANSLATE_SERVER_URL` in the client's `.env`). If the server is down, the
+overlay shows the live Arabic transcript only — there is no local fallback,
+so server reliability and pre-warming matter.
 
 ## Accuracy state (do not regress)
 
@@ -51,28 +52,35 @@ Quran = solved (canonical retrieval — fine-tuning cannot improve it).
 1. **Serve**: get `server/app.py` running with `translategemma:12b`
    (follow `notebooks/cloud_server.ipynb` cells — zstd → ollama → pull →
    uvicorn :8000 → cloudflared tunnel → print `TRANSLATE_SERVER_URL=`).
-2. **Fine-tune** TranslateGemma **4B first** (fits single T4 with QLoRA;
-   the tuned 4B also upgrades the mosque PC's offline fallback):
-   - Base: `google/translategemma-4b-it` (HF, requires license acceptance
+2. **Fine-tune TranslateGemma 12B — that is the mission target** (the tuned
+   12B is what serves the mosque; there is no local model anymore):
+   - Base: `google/translategemma-12b-it` (HF, requires license acceptance
      on the owner's HF account + `HF_TOKEN`)
    - Method: QLoRA 4-bit (peft/unsloth), r=16, lr ~1e-4, 1-2 epochs,
-     max_seq ~512. Keep it conservative — MT models forget fast.
+     max_seq ~512, `device_map="auto"` across both T4s. Conservative —
+     MT models forget fast. Expect ~8-15 h: **push checkpoints to HF
+     continuously and make the script resumable**, sessions die at ~12 h.
+   - Optional dry run: same script on `translategemma-4b-it` first (a few
+     hours on one T4) purely to validate data → train → merge → GGUF →
+     serve → eval end-to-end before spending the 12B hours.
    - Prompt format for training pairs must match inference exactly — see
      `PROMPT_TEMPLATE` in `src/backend/gemma_translate.py`.
 3. **Evaluate** after training: run `tests/eval_translation.py` pointed at
    the tuned model. Accept only if khutbah mean improves AND Quran/overall
    do not drop. If worse: reduce lr/epochs or cut synthetic data.
 4. **Save to HuggingFace** (owner's account, `HF_TOKEN` secret):
-   - LoRA adapter → `<user>/translategemma-4b-khutbah-lora`
-   - Merged model → `<user>/translategemma-4b-khutbah`
+   - LoRA adapter → `<user>/translategemma-12b-khutbah-lora`
+   - Merged model → `<user>/translategemma-12b-khutbah`
    - GGUF Q4_K_M (llama.cpp `convert_hf_to_gguf.py` + `llama-quantize`)
-     → same repo, so both cloud and mosque PC can pull it
+     → same repo, so every future session pulls the tuned model instead of
+     retraining
    - Push checkpoints DURING training (sessions die at 9-12 h; Kaggle wipes
      the disk — HF is the only persistence)
 5. **Register in Ollama**: `ollama create translategemma-khutbah -f Modelfile`
-   (FROM the GGUF; copy the template/params from `ollama show translategemma:4b
-   --template/--parameters`). Then set `OLLAMA_MODEL_ID=translategemma-khutbah`
-   for the server.
+   (FROM the GGUF; copy the template/params from `ollama show
+   translategemma:12b --template/--parameters`). Then set
+   `OLLAMA_MODEL_ID=translategemma-khutbah` for the server and re-run the
+   eval to confirm the improvement before announcing success.
 
 ## Training data (build it, ~30-40k pairs)
 
@@ -97,10 +105,10 @@ lookups if useful to you; runtime stays offline-local by design.
   after session, Internet must be enabled in settings. Secrets via Kaggle
   "Add-ons → Secrets" (`HF_TOKEN`).
 - Colab free: single T4, shorter/flakier sessions. Same notebooks work.
-- 4B QLoRA fits one T4. 12B QLoRA needs both T4s (device_map=auto) — only
-  attempt after 4B succeeds end-to-end.
-- The owner's mosque PC has no GPU (Intel Iris Xe) — anything meant to run
-  there must be CPU-viable (that's why 4B GGUF matters).
+- 12B QLoRA needs both T4s (`device_map="auto"`); 4B fits one T4 (dry-run
+  option). Long runs must checkpoint to HF and be resumable.
+- The owner's mosque PC has no GPU and runs no models on this branch —
+  everything model-related lives in this cloud session.
 - Cloudflare quick tunnels rotate URLs per session; print the
   `TRANSLATE_SERVER_URL=...` line prominently so the owner can update `.env`.
 
@@ -111,5 +119,6 @@ lookups if useful to you; runtime stays offline-local by design.
 - Log every eval run (the harness appends to `tests/eval_results.json` —
   commit that too).
 - If something is ambiguous, prefer the choice that cannot regress the
-  live Friday pipeline: the app must always be able to fall back to stock
-  `translategemma:4b` + Helsinki locally.
+  live Friday pipeline: the server must always be able to serve stock
+  `translategemma:12b` if the tuned model underperforms — keep
+  `OLLAMA_MODEL_ID` switchable and never delete the stock model.
