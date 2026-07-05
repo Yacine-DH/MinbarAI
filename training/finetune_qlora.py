@@ -67,7 +67,10 @@ def build_texts(tokenizer, max_len):
         # labels are produced (padded, -100 masked) by the LM data collator
         return tokenizer(batch["text"], truncation=True, max_length=max_len)
 
-    return ds.map(tok, batched=True, remove_columns=["text"])
+    ds = ds.map(tok, batched=True, remove_columns=["text"])
+    # 2% held-out val split: eval_loss during training flags overfitting
+    # early. The real quality benchmark stays tests/eval_translation.py.
+    return ds.train_test_split(test_size=0.02, seed=42)
 
 
 def main():
@@ -106,7 +109,7 @@ def main():
     ))
     model.print_trainable_parameters()
 
-    dataset = build_texts(tokenizer, args.max_len)
+    splits = build_texts(tokenizer, args.max_len)
 
     out_dir = str(ROOT / "training" / "out")
     targs = TrainingArguments(
@@ -118,6 +121,8 @@ def main():
         gradient_checkpointing=True,
         bf16=False, fp16=True,          # T4 has no bf16
         logging_steps=25,
+        eval_strategy="steps",
+        eval_steps=args.save_steps,
         save_steps=args.save_steps,
         save_total_limit=2,
         push_to_hub=True,
@@ -129,7 +134,9 @@ def main():
     )
 
     resume = any(Path(out_dir).glob("checkpoint-*")) if Path(out_dir).exists() else False
-    trainer = Trainer(model=model, args=targs, train_dataset=dataset,
+    trainer = Trainer(model=model, args=targs,
+                      train_dataset=splits["train"],
+                      eval_dataset=splits["test"],
                       processing_class=tokenizer,
                       data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False))
     trainer.train(resume_from_checkpoint=resume or None)
