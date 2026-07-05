@@ -22,6 +22,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
+    DataCollatorForLanguageModeling,
     Trainer,
     TrainingArguments,
 )
@@ -63,9 +64,8 @@ def build_texts(tokenizer, max_len):
     ds = Dataset.from_list([{"text": to_text(r)} for r in rows])
 
     def tok(batch):
-        out = tokenizer(batch["text"], truncation=True, max_length=max_len)
-        out["labels"] = out["input_ids"].copy()
-        return out
+        # labels are produced (padded, -100 masked) by the LM data collator
+        return tokenizer(batch["text"], truncation=True, max_length=max_len)
 
     return ds.map(tok, batched=True, remove_columns=["text"])
 
@@ -130,7 +130,8 @@ def main():
 
     resume = any(Path(out_dir).glob("checkpoint-*")) if Path(out_dir).exists() else False
     trainer = Trainer(model=model, args=targs, train_dataset=dataset,
-                      processing_class=tokenizer)
+                      processing_class=tokenizer,
+                      data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False))
     trainer.train(resume_from_checkpoint=resume or None)
     trainer.push_to_hub()
     print("done — adapter on the Hub:", args.hub_repo)
