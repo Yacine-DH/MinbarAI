@@ -28,27 +28,36 @@ from transformers import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# must match src/backend/gemma_translate.py PROMPT_TEMPLATE exactly —
-# training and inference prompts have to be identical
-PROMPT = (
-    "You are a professional Arabic (ar) to German (de-DE) translator. "
-    "Your goal is to accurately convey the meaning and nuances of the "
-    "original Arabic text while adhering to German grammar, vocabulary, "
-    "and cultural sensitivities. Produce only the German translation, "
-    "without any additional explanations or commentary. "
-    "Please translate the following Arabic text into German:\n\n\n{ar}"
-)
-
-
 def build_texts(tokenizer, max_len):
+    """TranslateGemma's chat template requires structured user content
+    (type/source_lang_code/target_lang_code) and renders the official
+    translation prompt itself — so training matches inference exactly."""
     rows = [json.loads(l) for l in
             (ROOT / "training" / "dataset.jsonl").read_text(encoding="utf-8").splitlines()]
 
+    def user_msg(ar):
+        return {"role": "user", "content": [{
+            "type": "text",
+            "source_lang_code": "ar",
+            "target_lang_code": "de-DE",
+            "text": ar,
+        }]}
+
+    # the template may want the assistant turn as a plain string or as the
+    # same structured form depending on version — probe once
+    probe = rows[0]
+    try:
+        tokenizer.apply_chat_template(
+            [user_msg(probe["ar"]), {"role": "assistant", "content": probe["de"]}],
+            tokenize=False)
+        def assistant_msg(de):
+            return {"role": "assistant", "content": de}
+    except Exception:
+        def assistant_msg(de):
+            return {"role": "assistant", "content": [{"type": "text", "text": de}]}
+
     def to_text(row):
-        messages = [
-            {"role": "user", "content": PROMPT.format(ar=row["ar"])},
-            {"role": "assistant", "content": row["de"]},
-        ]
+        messages = [user_msg(row["ar"]), assistant_msg(row["de"])]
         return tokenizer.apply_chat_template(messages, tokenize=False)
 
     ds = Dataset.from_list([{"text": to_text(r)} for r in rows])
