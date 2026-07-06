@@ -15,10 +15,10 @@ from pathlib import Path
 import modal
 
 # --- what to serve ---
-TUNED_GGUF = "https://huggingface.co/Yacinedh/translategemma-4b-khutbah/resolve/main/model-Q4_K_M.gguf"
-SERVE_TUNED = False                   # False -> serve STOCK_MODEL instead
-STOCK_MODEL = "translategemma:4b"
-TUNED_NAME = "translategemma-khutbah"
+TUNED_GGUF = "https://huggingface.co/Yacinedh/translategemma-12b-khutbah/resolve/main/model-Q4_K_M.gguf"
+SERVE_TUNED = True                    # False -> serve STOCK_MODEL instead
+STOCK_MODEL = "translategemma:12b"
+TUNED_NAME = "translategemma-khutbah-12b"
 
 APP_NAME = "minbarai-translate-tuned"
 app = modal.App(APP_NAME)
@@ -92,7 +92,7 @@ class Translator:
 
         if SERVE_TUNED and TUNED_NAME not in have:
             print("[modal-tuned] downloading tuned GGUF from HF (one-time)...", flush=True)
-            gguf = Path("/root/.ollama/tuned.gguf")
+            gguf = Path("/root/.ollama/tuned-12b.gguf")
             urllib.request.urlretrieve(TUNED_GGUF, gguf)
             Path("/root/Modelfile").write_text(MODELFILE_TEMPLATE.format(gguf=gguf))
             subprocess.run(["ollama", "create", TUNED_NAME, "-f", "/root/Modelfile"], check=True)

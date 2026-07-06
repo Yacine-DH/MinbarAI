@@ -109,6 +109,27 @@ formulas, ~10% hadith — the expected live accuracy is ≈0.957). Remaining
 free-rhetoric ceiling is the 12B model itself → fine-tuning per
 KAGGLE_MISSION.md is the next lever.
 
+## Fine-tuning round (2026-07-06)
+
+QLoRA (r=16, lr 1e-4, 1 epoch) on 24,240 ar-de pairs (4 German Quran
+editions, formulas, hadith, terminology; all 74 eval sentences excluded).
+Recipe validated first on 4B (Kaggle T4, stock 0.9368 → tuned 0.9527 —
+tuned 4B ≈ stock 12B). 12B trained on Colab Pro A100 in bf16 after T4/fp16
+produced nan (gemma3-12b overflows in fp16 — hard lesson, 2 h of quota).
+Train loss 3.28→0.27; eval_loss monotonic 0.464→0.269 (no overfit).
+Artifacts on HF (`Yacinedh/translategemma-12b-khutbah{,-lora}` + Q4_K_M
+GGUF).
+
+| Model (identical pipeline) | Overall | Suite | Imam rhetoric | chrF |
+|---|---|---|---|---|
+| stock 12B (v12) | 0.9535 | 0.9268 | 0.8836 | 80.8 |
+| **tuned 12B (v14/v15, production)** | **0.9564** | **0.9314** | **0.8959** | **83.8** |
+
+Qualitative: strict-template refusals on saj'/hadith fragments are gone.
+Production Modal app serves the tuned GGUF (`translategemma-khutbah-12b`);
+rollback = set `MODEL_ID = "translategemma:12b"` in `server/modal_app.py`
+and redeploy.
+
 ## Remote 12B booster (v5)
 
 Kaggle T4×2 runs `translategemma:12b` (Q4_K_M, 8.1 GB), exposed through a

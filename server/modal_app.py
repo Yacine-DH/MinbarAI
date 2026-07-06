@@ -22,11 +22,33 @@ warm-up request 10 minutes before the khutbah, e.g.:
 import subprocess
 import time
 import urllib.request
+from pathlib import Path
 
 import modal
 
-MODEL_ID = "translategemma:12b"
+# fine-tuned 12B (khutbah domain, QLoRA on google/translategemma-12b-it):
+# beats stock 0.9535 -> 0.9564 overall on the 74-case eval (v14).
+# Rollback: set MODEL_ID = "translategemma:12b" and redeploy.
+TUNED_GGUF = "https://huggingface.co/Yacinedh/translategemma-12b-khutbah/resolve/main/model-Q4_K_M.gguf"
+MODEL_ID = "translategemma-khutbah-12b"
 APP_NAME = "minbarai-translate"
+
+MODELFILE_TEMPLATE = '''FROM {gguf}
+TEMPLATE """{{{{- range $i, $_ := .Messages }}}}
+{{{{- $last := eq (len (slice $.Messages $i)) 1 }}}}
+{{{{- if or (eq .Role "user") (eq .Role "system") }}}}<start_of_turn>user
+{{{{ .Content }}}}<end_of_turn>
+{{{{ if $last }}}}<start_of_turn>model
+{{{{ end }}}}
+{{{{- else if eq .Role "assistant" }}}}<start_of_turn>model
+{{{{ .Content }}}}{{{{ if not $last }}}}<end_of_turn>
+{{{{ end }}}}
+{{{{- end }}}}
+{{{{- end }}}}"""
+PARAMETER stop <end_of_turn>
+PARAMETER top_k 64
+PARAMETER top_p 0.95
+'''
 
 app = modal.App(APP_NAME)
 
@@ -84,13 +106,20 @@ class Translator:
                 break
             except Exception:
                 time.sleep(1)
-        # pull only if the volume doesn't have it yet (first deploy)
+        # provision only if the volume doesn't have it yet (first deploy)
         have = subprocess.run(
             ["ollama", "list"], capture_output=True, text=True
         ).stdout
         if MODEL_ID not in have:
-            print(f"[modal] pulling {MODEL_ID} into volume (one-time)...", flush=True)
-            subprocess.run(["ollama", "pull", MODEL_ID], check=True)
+            if MODEL_ID.startswith("translategemma:"):
+                print(f"[modal] pulling {MODEL_ID} into volume (one-time)...", flush=True)
+                subprocess.run(["ollama", "pull", MODEL_ID], check=True)
+            else:
+                print("[modal] downloading tuned GGUF from HF (one-time)...", flush=True)
+                gguf = Path("/root/.ollama/khutbah-12b.gguf")
+                urllib.request.urlretrieve(TUNED_GGUF, gguf)
+                Path("/root/Modelfile").write_text(MODELFILE_TEMPLATE.format(gguf=gguf))
+                subprocess.run(["ollama", "create", MODEL_ID, "-f", "/root/Modelfile"], check=True)
             ollama_volume.commit()
         # load weights into the GPU now so the first chunk isn't slow and
         # gemma never times out against the fast Helsinki candidate
