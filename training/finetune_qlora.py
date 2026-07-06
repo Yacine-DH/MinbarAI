@@ -13,6 +13,7 @@ After training: merge + GGUF conversion (see notebooks/finetune_kaggle.ipynb).
 """
 import argparse
 import json
+import os
 from pathlib import Path
 
 import torch
@@ -81,10 +82,23 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--rank", type=int, default=16)
     ap.add_argument("--max-len", type=int, default=512)
-    ap.add_argument("--batch", type=int, default=2)
-    ap.add_argument("--grad-accum", type=int, default=8)
-    ap.add_argument("--save-steps", type=int, default=200)
+    ap.add_argument("--batch", type=int, default=1)
+    ap.add_argument("--grad-accum", type=int, default=16)
+    ap.add_argument("--save-steps", type=int, default=150)
+    ap.add_argument("--precision", choices=["fp32", "fp16", "bf16"], default="fp32",
+                    help="fp32 on T4 (gemma3-12b overflows in fp16); bf16 on Ampere+")
     args = ap.parse_args()
+
+    os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
+
+    # Gemma3-12B overflows in fp16 (loss=1e8 -> nan on T4, which has no
+    # bf16). fp32 compute is the stable path on T4; use bf16 on Ampere+.
+    if args.precision == "bf16":
+        compute_dtype = torch.bfloat16
+    elif args.precision == "fp16":
+        compute_dtype = torch.float16
+    else:
+        compute_dtype = torch.float32
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = AutoModelForCausalLM.from_pretrained(
@@ -93,7 +107,7 @@ def main():
         quantization_config=BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_compute_dtype=compute_dtype,
         ),
         attn_implementation="eager",
     )
@@ -117,9 +131,11 @@ def main():
         num_train_epochs=args.epochs,
         learning_rate=args.lr,
         per_device_train_batch_size=args.batch,
+        per_device_eval_batch_size=1,   # default 8 OOMed the 12B eval pass
         gradient_accumulation_steps=args.grad_accum,
         gradient_checkpointing=True,
-        bf16=False, fp16=True,          # T4 has no bf16
+        bf16=args.precision == "bf16",
+        fp16=args.precision == "fp16",
         logging_steps=25,
         eval_strategy="steps",
         eval_steps=args.save_steps,
