@@ -16,6 +16,18 @@ _GENERIC_PRECEDERS = {
 
 _NON_LATIN = re.compile(r"[Ѐ-ӿ؀-ۿ一-鿿぀-ヿ]")
 
+_REFUSAL = re.compile(
+    r"kann (diese|die|diesen|den) (Anfrage|Text)|kann ich (leider )?nicht"
+    r"|Ich kann (leider )?nicht|nicht (bearbeiten|übersetzen)|als KI"
+    r"|als Sprachmodell|Bitte (geben|stellen) Sie",
+    re.IGNORECASE,
+)
+
+
+def is_refusal(text: str) -> bool:
+    """MT models occasionally refuse instead of translating."""
+    return bool(_REFUSAL.search(text))
+
 
 def looks_german(text: str) -> bool:
     """Reject MT output that leaked another script (observed: Cyrillic)."""
@@ -40,6 +52,11 @@ _TERMS = [
     (re.compile(r"\bBoten\b"), "Gesandten"),
     (re.compile(r"\bBote\b"), "Gesandter"),
     (re.compile(r"\bMohammed\b"), "Muhammad"),
+    (re.compile(r"\bSklaven\b"), "Diener"),   # عبد in religious context
+    (re.compile(r"\bSklave\b"), "Diener"),
+    (re.compile(r"\bSklavin\b"), "Dienerin"),
+    (re.compile(r"\bMoslems\b"), "Muslime"),
+    (re.compile(r"\bMoslem\b"), "Muslim"),
 ]
 
 

@@ -127,6 +127,8 @@ def _follows(prev_ref: str, ref: str) -> bool:
 
 def refs_overlap(a: str, b: str) -> bool:
     """True when two matches refer to overlapping verse ranges (continued recitation)."""
+    if a == b:
+        return True  # also covers non-verse refs like "formula:<id>"
     try:
         ca, la, ha = _ref_span(a)
         cb, lb, hb = _ref_span(b)

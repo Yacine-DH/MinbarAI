@@ -21,13 +21,13 @@ from backend import postprocess
 
 load_dotenv()
 
-LOCAL_HOST = "http://localhost:11434"
-LOCAL_MODEL = "translategemma:4b"
+LOCAL_HOST = os.getenv("OLLAMA_HOST_URL", "http://localhost:11434")
+LOCAL_MODEL = os.getenv("OLLAMA_MODEL_ID", "translategemma:4b")
 REMOTE_HOST = (os.getenv("REMOTE_OLLAMA_HOST") or "").rstrip("/")
 REMOTE_MODEL = os.getenv("REMOTE_MODEL_ID", "translategemma:12b")
 
 HEALTH_INTERVAL = 30.0   # seconds between endpoint health checks
-REQUEST_TIMEOUT = 20.0   # per-call timeout (remote tunnels can hang)
+REQUEST_TIMEOUT = float(os.getenv("GEMMA_TIMEOUT", "20"))  # per-call timeout
 
 PROMPT_TEMPLATE = (
     "You are a professional Arabic (ar) to German (de-DE) translator. "
@@ -36,6 +36,17 @@ PROMPT_TEMPLATE = (
     "and cultural sensitivities. Produce only the German translation, "
     "without any additional explanations or commentary. "
     "Please translate the following Arabic text into German:\n\n\n"
+    "{text}"
+)
+
+# retry template for inputs the strict template refuses: classical rhymed
+# prose (saj'), hadith fragments, incomplete phrases from the ASR buffer
+ROBUST_TEMPLATE = (
+    "You are a professional Arabic (ar) to German (de-DE) translator "
+    "working on a live mosque sermon (khutbah). The input may be a "
+    "fragment, rhymed classical prose, a hadith, or an incomplete phrase — "
+    "translate it into German as faithfully as possible anyway. Never "
+    "refuse, never explain; output only the German translation.\n\n\n"
     "{text}"
 )
 
@@ -116,10 +127,11 @@ def active_endpoint() -> str:
     return "none"
 
 
-def translate(text: str) -> str:
+def translate(text: str, temperature: float = 0.0, robust: bool = False) -> str:
     if not _ready.is_set():
         raise RuntimeError("gemma not ready")
-    prompt = PROMPT_TEMPLATE.format(text=text)
+    template = ROBUST_TEMPLATE if robust else PROMPT_TEMPLATE
+    prompt = template.format(text=text)
     last_exc = None
     for ep in _endpoints:
         if not ep.alive:
@@ -128,7 +140,9 @@ def translate(text: str) -> str:
             response = ep.client.chat(
                 model=ep.model,
                 messages=[{"role": "user", "content": prompt}],
-                options={"temperature": 0.0, "num_predict": 512},
+                # short ctx + output cap: chunks are <20 words, translations
+                # short — keeps KV cache tiny and stops runaway generations
+                options={"temperature": temperature, "num_predict": 192, "num_ctx": 2048},
             )
             msg = getattr(response, "message", None)
             if msg is None and isinstance(response, dict):

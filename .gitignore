@@ -7,3 +7,8 @@ settings.json
 .claude/worktrees/
 history.json
 .claude/settings.local.json
+training/dataset.jsonl
+training/out/
+build/
+dist/
+*.spec.bak

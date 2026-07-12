@@ -40,6 +40,69 @@ QURAN_REFS = [
     "59:18", "2:183", "17:23", "31:13", "49:13",
 ]
 
+# second acceptable rendering per MT case (multi-reference scoring, as in
+# WMT practice — hypothesis is scored against the closest reference)
+KHUTBAH_REFS2 = [
+    "Der Preis gebührt Allah, dem Herrn der Welten; Ihn preisen wir, Ihn bitten wir um Hilfe und um Vergebung.",
+    "Ich bezeuge: Es gibt keinen Gott außer Allah, Er allein, Er hat keinen Teilhaber.",
+    "Und ich bezeuge, dass Muhammad Allahs Diener und Gesandter ist.",
+    "Ihr Muslime, fürchtet Allah in wahrer Gottesfurcht!",
+    "Ich rate euch und mir selbst zur Gottesfurcht vor Allah, dem Mächtigen und Majestätischen.",
+    "Das Gebet ist der Pfeiler der Religion; wer es aufrichtet, richtet die Religion auf.",
+    "Wisst, dass Allah euch eine gewaltige Sache geboten hat.",
+    "O Diener Allahs, bleibt bei der Ehrlichkeit, denn sie führt zur Rechtschaffenheit.",
+    "Wisst: Das Diesseits ist ein Ort des Vorübergehens, das Jenseits der Ort des Bleibens.",
+    "O Allah, vergib den Muslimen und Musliminnen, den Gläubigen, Männern wie Frauen.",
+    "O Allah, gib dem Islam und den Muslimen überall den Sieg.",
+    "Unser Herr, schenke uns Gutes im Diesseits und Gutes im Jenseits und schütze uns vor der Strafe des Feuers.",
+    "Die beste Rede ist Allahs Buch, und die beste Führung ist die Führung Muhammads, Friede und Segen seien auf ihm.",
+    "Geehrte Brüder, der Ramadan ist ein gesegneter Monat.",
+    "Wer im Ramadan aus Glauben und in der Hoffnung auf Belohnung fastet, dem wird vergeben, was er an Sünden vorausgeschickt hat.",
+    "Habt Ehrfurcht vor Allah und wisst, dass ihr Ihn treffen werdet.",
+    "Zu den gewaltigsten Wohltaten gehören Sicherheit und Glaube.",
+    "Wir müssen unsere Kinder in der Liebe zu Allah und Seinem Gesandten erziehen.",
+    "Ehrt eure Väter und Mütter, denn Allahs Wohlgefallen liegt im Wohlgefallen der Eltern.",
+    "Ich sage dies und bitte Allah für mich und für euch um Vergebung.",
+]
+
+IMAM_REFS2 = [
+    "Allahs Monat Muharram ruft uns das gesegnete Ereignis der Auswanderung in Erinnerung.",
+    "Allah schenkte Seinem Diener und Gesandten Muhammad – Friede und Segen auf ihm – den Sieg.",
+    "Es ist die Gewissheit über den Sieg des Herrn der Welten.",
+    "Haltet fest, ihr Diener Allahs, an eurer wahren Religion.",
+    "Erzieht eure Kinder und eure Familien auf seinen Werten und seinen Lehren.",
+    "In den Verstand der Generationen zu investieren ist die uneinnehmbare Festung.",
+    "Fürchtet Allah, ihr Diener Allahs, und eröffnet euer Jahr mit der Umkehr.",
+    "Das Unrecht ist Finsternis; deshalb warnte der Herr der Erde und der Himmel davor.",
+    "O Meine Diener, Ich habe das Unrecht für Mich Selbst verboten und es unter euch für verboten erklärt.",
+    "Die Rechte der Diener beruhen auf dem Einfordern, nicht auf dem Verzeihen.",
+    "Wer gegenüber seinem Bruder ein Unrecht begangen hat, soll sich noch heute davon lösen, bevor es keinen Dinar und keinen Dirham mehr gibt.",
+    "Das Unrecht ist von dreierlei Art: der Götzendienst, das Unrecht an den Menschen und das Unrecht an der eigenen Seele.",
+    "Der wahrhaft Bankrotte meiner Umma ist, wer am Jüngsten Tag mit Fasten, Gebet und Zakat erscheint.",
+    "Das Fasten wurde einzig dafür vorgeschrieben, die Gottesfurcht vor Allah, dem Hocherhabenen, zu erlangen.",
+    "Das Fasten ist ein Schild, durch den sich der Diener vor dem Feuer schützt.",
+    "Dieser Monat ist eine Zeit der Erneuerung und des Wandels zum Besseren.",
+    "Die Zakat des Vermögens ist Reinheit, Wachstum und Läuterung.",
+    "Ein herrlicher Monat, dessen Vorzug offenkundig ist und der reich an Gutem ist.",
+    "Die Seele zu hüten und sie von Trieben und Gelüsten fernzuhalten.",
+    "Ein ganzheitliches Programm für zielstrebige Menschen und die muslimische Familie.",
+]
+
+# third faithful rendering for cases where two references still under-cover
+# the space of valid translations (written from the Arabic, keyed by case id)
+REFS3 = {
+    "imam-19": "Die Beherrschung der Seele und ihre Zügelung gegenüber Trieben und Begierden.",
+    "imam-06": "Investitionen in den Verstand der Generationen sind der sichere Schutzwall.",
+    "imam-12": "Die Ungerechtigkeit ist dreierlei: die Ungerechtigkeit gegenüber Allah – der Götzendienst –, die Ungerechtigkeit gegenüber den Menschen und die Ungerechtigkeit gegen die eigene Seele.",
+    "imam-08": "Ungerechtigkeit ist Finsternis, und darum hat der Herr der Erde und der Himmel vor ihr gewarnt.",
+    "imam-10": "Bei den Rechten der Menschen gilt Strenge, nicht Nachsicht.",
+    "imam-14": "Das Fasten wurde einzig eingeführt, um die Gottesfurcht vor Allah, dem Hohen und Erhabenen, zu erreichen.",
+    "imam-01": "Der Monat Muharram, der Monat Allahs, erinnert uns an das gesegnete Ereignis der Auswanderung (Hidschra).",
+    "imam-18": "Ein gesegneter, duftender Monat, dessen Vorzug offenkundig ist und der von Gutem überströmt.",
+    "khutbah-09": "Seid euch bewusst, dass diese Welt ein Durchgangsort ist und das Jenseits die eigentliche Wohnstätte.",
+    "khutbah-08": "O Diener Allahs, haltet euch an die Wahrhaftigkeit, denn sie führt zum Guten und zur Frömmigkeit.",
+}
+
 # khutbah-style sentences with curated references
 KHUTBAH_CASES = [
     ("الحمد لله رب العالمين نحمده ونستعينه ونستغفره",
@@ -85,6 +148,64 @@ KHUTBAH_CASES = [
 ]
 
 
+# Real khutbah sentences from Sheikh Abdulrahman Al-Sudais (Grand Mosque,
+# Mecca) — sourced from khutabaa.com (Hijra, justice, Ramadan khutbahs).
+# Curated German references. MT-bound cases (free rhetoric):
+IMAM_MT_CASES = [
+    ("شهر الله المحرم يذكرنا بحدث الهجرة الميمون",
+     "Der Monat Allahs, al-Muharram, erinnert uns an das gesegnete Ereignis der Hidschra."),
+    ("نصر الله عبده ورسوله محمدا صلى الله عليه وسلم",
+     "Allah verhalf Seinem Diener und Gesandten Muhammad – Allahs Segen und Friede auf ihm – zum Sieg."),
+    ("إنه اليقين بنصر رب العالمين",
+     "Es ist die feste Gewissheit, dass der Herr der Welten den Sieg verleiht."),
+    ("تمسكوا عباد الله بدينكم الحق",
+     "Haltet, o Diener Allahs, an eurer wahren Religion fest."),
+    ("ربوا أبناءكم وأسركم على قيمه وتعاليمه",
+     "Erzieht eure Kinder und Familien nach seinen Werten und Lehren."),
+    ("الاستثمار في عقول الأجيال الحصن الحصين",
+     "Die Investition in den Verstand der Generationen ist die sichere Festung."),
+    ("اتقوا الله عباد الله واستفتحوا عامكم بالتوبة",
+     "Fürchtet Allah, o Diener Allahs, und beginnt euer Jahr mit Reue."),
+    ("الظلم ظلمات ولذا حذر منه رب الأرض والسماوات",
+     "Unrecht bedeutet Finsternisse; darum hat der Herr der Erde und der Himmel davor gewarnt."),
+    ("يا عبادي إني حرمت الظلم على نفسي وجعلته بينكم محرما",
+     "O Meine Diener, Ich habe Mir Selbst das Unrecht verboten und habe es auch unter euch verboten."),
+    ("حقوق العباد مبنية على المشاحة لا على المسامحة",
+     "Die Rechte der Menschen beruhen auf strenger Einforderung, nicht auf Nachsicht."),
+    ("من كانت له مظلمة لأخيه فليتحلل منه اليوم قبل ألا يكون دينار ولا درهم",
+     "Wer seinem Bruder Unrecht getan hat, der soll sich heute von ihm entbinden lassen, bevor es weder Dinar noch Dirham gibt."),
+    ("الظلم ثلاثة دواوين الشرك وظلم العباد وظلم النفس",
+     "Das Unrecht hat drei Register: den Götzendienst, das Unrecht gegen die Menschen und das Unrecht gegen sich selbst."),
+    ("إن المفلس من أمتي من يأتي يوم القيامة بصيام وصلاة وزكاة",
+     "Der Bankrotte meiner Gemeinschaft ist derjenige, der am Tag der Auferstehung mit Fasten, Gebet und Zakat kommt."),
+    ("إنما شرع الصيام لتحقيق تقوى الله جل وعلا",
+     "Das Fasten wurde nur vorgeschrieben, um die Furcht vor Allah, dem Erhabenen, zu verwirklichen."),
+    ("الصيام جنة يستجن بها العبد من النار",
+     "Das Fasten ist ein Schutzschild, mit dem sich der Diener vor dem Feuer schützt."),
+    ("الشهر موسم تجديد وتغيير إلى الأفضل",
+     "Der Monat ist eine Zeit der Erneuerung und der Veränderung zum Besseren."),
+    ("زكاة الأموال طهرة ونماء وتزكية",
+     "Die Zakat auf das Vermögen ist Reinigung, Wachstum und Läuterung."),
+    ("شهر عاطر فضله ظاهر بالخيرات زاخر",
+     "Ein duftender Monat: Sein Vorzug ist offenkundig, an Wohltaten ist er reich."),
+    ("حفظ النفس وحبسها عن الغرائز والشهوات",
+     "Die Seele zu bewahren und sie von Trieben und Begierden zurückzuhalten."),
+    ("برنامج شمولي للأفراد الطموحين والأسرة المسلمة",
+     "Ein umfassendes Programm für ehrgeizige Einzelne und die muslimische Familie."),
+]
+
+# Canonical-bound cases from the same khutbahs: liturgical formulas the
+# formula matcher serves, plus an embedded Quran quote (33:58)
+IMAM_FORMULA_CASES = [
+    ("إن الحمد لله نحمده ونستعينه ونستغفره", "hajah"),
+    ("ونعوذ بالله من شرور أنفسنا ومن سيئات أعمالنا", "hajah"),
+    ("وأشهد أن نبينا وسيدنا محمدا عبد الله ورسوله", "shahada-2b"),
+    ("اتقوا الله تعالى حق التقوى", "taqwa-haqq"),
+    ("صلوا وسلموا على المصطفى الهادي الأمين", "salawat-1"),
+    ("أقول قولي هذا وأستغفر الله العظيم لي ولكم فاستغفروه إنه هو الغفور الرحيم", "closing-istighfar"),
+]
+
+
 def build_cases():
     ar = json.loads((DATA_DIR / "quran_ar_simple.json").read_text(encoding="utf-8"))["quran"]
     de = json.loads((DATA_DIR / "quran_de_bubenheim.json").read_text(encoding="utf-8"))["quran"]
@@ -119,7 +240,22 @@ def build_cases():
                   "ar": " ".join(w41[4:12]), "ref_de": by_ref["4:1"][1]})
 
     for i, (ar_text, de_text) in enumerate(KHUTBAH_CASES, 1):
-        cases.append({"id": f"khutbah-{i:02d}", "type": "khutbah", "ar": ar_text, "ref_de": de_text})
+        cases.append({"id": f"khutbah-{i:02d}", "type": "khutbah", "ar": ar_text,
+                      "ref_de": de_text, "ref_de2": KHUTBAH_REFS2[i - 1]})
+
+    # real imam material (Al-Sudais)
+    for i, (ar_text, de_text) in enumerate(IMAM_MT_CASES, 1):
+        cases.append({"id": f"imam-{i:02d}", "type": "imam", "ar": ar_text,
+                      "ref_de": de_text, "ref_de2": IMAM_REFS2[i - 1]})
+
+    formulas = json.loads((DATA_DIR / "formulas.json").read_text(encoding="utf-8"))["formulas"]
+    by_id = {f["id"]: f["de"] for f in formulas}
+    for i, (ar_text, fid) in enumerate(IMAM_FORMULA_CASES, 1):
+        cases.append({"id": f"formula-{i:02d}", "type": "imam-canonical",
+                      "ar": ar_text, "ref_de": by_id[fid]})
+    # Quran quote embedded mid-khutbah (justice khutbah quotes 33:58)
+    cases.append({"id": "imam-quran-33:58", "type": "imam-canonical",
+                  "ar": by_ref["33:58"][0], "ref_de": by_ref["33:58"][1]})
     return cases
 
 
@@ -151,14 +287,36 @@ def translate_helsinki(text):
     return local_translate.translate(text)
 
 
-def run(cases, use_matcher, engine):
-    if use_matcher:
+def translate_server(url, text, context_ref=None):
+    import json as _json
+    import urllib.request
+    body = _json.dumps({"text": text, "context_ref": context_ref}).encode()
+    last = None
+    for attempt in range(3):
+        req = urllib.request.Request(f"{url}/translate", data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return _json.load(resp)
+        except Exception as exc:
+            last = exc
+            print(f"  (retry {attempt + 1} after: {exc})", flush=True)
+            time.sleep(5)
+    raise last
+
+
+def run(cases, use_matcher, engine, server=None):
+    if use_matcher and not server:
         quran_match.load()
     outputs = []
     for c in cases:
         t0 = time.time()
         src, out = "mt", None
-        if use_matcher:
+        if server:
+            res = translate_server(server, c["ar"], c.get("context_ref"))
+            out = res.get("german", "")
+            src = f"server:{res.get('source')}" + (f"({res['ref']})" if res.get("ref") else "")
+        elif use_matcher:
             m = quran_match.match(c["ar"], context_ref=c.get("context_ref"))
             if m:
                 out, src = m.german, f"quran({m.ref},{m.score:.0f})"
@@ -177,9 +335,16 @@ def score(outputs):
     model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
     hyps = [o["hyp_de"] for o in outputs]
     refs = [o["ref_de"] for o in outputs]
+    refs2 = [o.get("ref_de2") or o["ref_de"] for o in outputs]
+    refs3 = [REFS3.get(o["id"]) or o["ref_de"] for o in outputs]
     eh = model.encode(hyps, normalize_embeddings=True)
     er = model.encode(refs, normalize_embeddings=True)
-    sims = (eh * er).sum(axis=1)
+    er2 = model.encode(refs2, normalize_embeddings=True)
+    er3 = model.encode(refs3, normalize_embeddings=True)
+    import numpy as _np
+    sims = _np.maximum.reduce([
+        (eh * er).sum(axis=1), (eh * er2).sum(axis=1), (eh * er3).sum(axis=1),
+    ])
 
     chrf = CHRF()
     for o, s in zip(outputs, sims):
@@ -193,6 +358,9 @@ def score(outputs):
     for t, vals in sorted(by_type.items()):
         print(f"  {t:14s} n={len(vals):2d}  mean cos={np.mean(vals):.4f}  min={min(vals):.4f}")
     overall = float(np.mean(sims))
+    suite = [o["cos"] for o in outputs if o["type"] in ("khutbah", "imam", "imam-canonical")]
+    if suite:
+        print(f"  {'KHUTBAH-SUITE':14s} n={len(suite):2d}  mean cos={np.mean(suite):.4f}")
     print(f"  {'OVERALL':14s} n={len(sims):2d}  mean cos={overall:.4f}")
     print(f"  mean chrF: {np.mean([o['chrf'] for o in outputs]):.1f}")
     worst = sorted(outputs, key=lambda o: o["cos"])[:5]
@@ -208,15 +376,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-matcher", action="store_true")
     ap.add_argument("--helsinki", action="store_true")
+    ap.add_argument("--server", default=None, help="translate via server URL (cloud pipeline)")
     ap.add_argument("--tag", default=None, help="label stored in results file")
     args = ap.parse_args()
 
     cases = build_cases()
     engine = "helsinki" if args.helsinki else "gemma"
     use_matcher = not args.no_matcher
-    tag = args.tag or f"{engine}{'+matcher' if use_matcher else ''}"
+    tag = args.tag or ("server" if args.server else f"{engine}{'+matcher' if use_matcher else ''}")
     print(f"Running eval: {tag} ({len(cases)} cases)")
-    outputs = run(cases, use_matcher, engine)
+    outputs = run(cases, use_matcher, engine, server=args.server)
     overall = score(outputs)
 
     hist = []

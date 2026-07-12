@@ -9,12 +9,9 @@ import time
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from backend import audio
+from backend import cloud_translate
 from backend import scribe_batch as transcribe_module
-from backend import gemma_translate
-from backend import postprocess
-from backend import quran_match
-from backend import rerank
-from backend import local_translate as translate_module
+from backend import quran_match  # refs_overlap only (pure string helper)
 
 arabic_queue: "queue.Queue[str]" = queue.Queue()
 
@@ -42,20 +39,21 @@ class TranslateWorker(QThread):
        * Silence > SILENCE_TIMEOUT seconds since last received
        * Buffer reaches MAX_WORDS words
 
-    Translation chain: Gemma (local Ollama) -> Helsinki (local fallback).
+    Cloud-only: every chunk goes to the translation server
+    (TRANSLATE_SERVER_URL), which runs verse matcher + MT + rerank.
+    No models run on this machine; while the server is unreachable the
+    overlay keeps showing the live Arabic transcript only.
     """
 
     result = pyqtSignal(str, str, str)  # (arabic, german, quran ref or "")
 
     MAX_WORDS = 8
     SILENCE_TIMEOUT = 0.7
-    MIN_GEMMA_INTERVAL = 0.0   # local model — no rate limit needed
 
     def run(self):
-        print("[translate] worker started", flush=True)
+        print("[translate] worker started (cloud-only)", flush=True)
         buffer = []
         last_received = None
-        self._last_gemma_call = 0.0
         self._last_verse_ref = None
 
         while True:
@@ -87,9 +85,6 @@ class TranslateWorker(QThread):
                 print(f"[translate] worker error: {exc}", flush=True)
             self.msleep(10)
 
-    def _gemma_ok_to_call(self):
-        return (time.time() - self._last_gemma_call) >= self.MIN_GEMMA_INTERVAL
-
     def _flush(self, buffer):
         combined = " ".join(s.strip() for s in buffer if s and s.strip()).strip()
         if not combined:
@@ -98,54 +93,25 @@ class TranslateWorker(QThread):
 
         print(f"[translate] flushing: {combined[:60]!r}...", flush=True)
 
-        # Quran quotation? serve the canonical Bubenheim translation
-        if quran_match.is_ready():
-            m = quran_match.match(combined, context_ref=self._last_verse_ref)
-            if m:
-                if self._last_verse_ref and quran_match.refs_overlap(m.ref, self._last_verse_ref):
-                    # continued recitation of a verse already displayed
-                    print(f"[translate] quran {m.ref} continues {self._last_verse_ref} — skip", flush=True)
-                    self._last_verse_ref = m.ref
-                    return
-                print(f"[translate] quran match {m.ref} (score={m.score:.0f})", flush=True)
-                self._last_verse_ref = m.ref
-                self.result.emit(combined, m.german, m.ref)
-                return
-        self._last_verse_ref = None
-
-        candidates = []
-        if gemma_translate.is_ready() and self._gemma_ok_to_call():
-            try:
-                self._last_gemma_call = time.time()
-                out = gemma_translate.translate(combined)
-                if postprocess.looks_german(out):
-                    candidates.append(("gemma", out))
-                    print(f"[translate] gemma OK → {out[:60]!r}", flush=True)
-                else:
-                    print(f"[translate] gemma output not German → dropped: {out[:60]!r}", flush=True)
-            except Exception as exc:
-                print(f"[translate] gemma failed: {exc}", flush=True)
-        else:
-            print(f"[translate] gemma skipped (ready={gemma_translate.is_ready()})", flush=True)
-
-        # Helsinki: fast local second opinion (only when loaded, or as last resort)
-        if translate_module.is_ready() or not candidates:
-            try:
-                out = translate_module.translate(combined)
-                candidates.append(("helsinki", out))
-                print(f"[translate] Helsinki OK → {out[:60]!r}", flush=True)
-            except Exception as exc:
-                print(f"[translate] Helsinki failed: {exc}", flush=True)
-
-        if not candidates:
-            print("[translate] no translation produced", flush=True)
+        if not cloud_translate.is_ready():
+            print("[translate] server unreachable — chunk dropped (transcript stays live)", flush=True)
             return
 
-        if len(candidates) > 1 and rerank.is_ready():
-            (label, german), qe = rerank.pick(combined, candidates)
-            print(f"[translate] rerank picked {label} (qe={qe:.2f})", flush=True)
-        else:
-            label, german = candidates[0]
+        try:
+            res = cloud_translate.translate(combined, context_ref=self._last_verse_ref)
+        except Exception as exc:
+            print(f"[translate] server call failed — chunk dropped: {exc}", flush=True)
+            return
 
-        print("[translate] emitting result", flush=True)
-        self.result.emit(combined, german, "")
+        german, ref = res.get("german", ""), res.get("ref", "")
+        if not german:
+            print("[translate] server returned empty translation", flush=True)
+            return
+        if ref and self._last_verse_ref and quran_match.refs_overlap(ref, self._last_verse_ref):
+            # continued recitation of a verse whose full translation is shown
+            print(f"[translate] {ref} continues {self._last_verse_ref} — skip", flush=True)
+            self._last_verse_ref = ref
+            return
+        self._last_verse_ref = ref or None
+        print(f"[translate] cloud OK [{res.get('source')}] → {german[:60]!r}", flush=True)
+        self.result.emit(combined, german, ref)

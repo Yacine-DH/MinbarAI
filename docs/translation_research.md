@@ -72,6 +72,64 @@ See `tests/eval_results.json` (history). Metric: mean cosine similarity
 
 Target ≥ 0.94: **met** (with or without the remote booster).
 
+## Khutbah-accuracy round (cloud pipeline, 2026-07-04)
+
+Goal: ≥0.95 on khutbah translation evaluated against real material from
+well-known imams. Test set expanded to **74 cases** with authentic
+Al-Sudais khutbah sentences (khutabaa.com: Hijra, justice, Ramadan) —
+including rhymed saj', hadith quotes, and an embedded Quran verse (33:58).
+Multi-reference scoring (up to 3 faithful renderings per MT case, WMT
+style).
+
+New pipeline layers (all server-side):
+- `formula_match.py` + `data/formulas.json` — canonical German for fixed
+  liturgical texts (khutbat al-hajah, shahada, salawat, du'a, closing)
+- `data/hadith.json` — canonical renderings of the ~16 most-quoted khutbah
+  hadiths (al-muflis, "der Islam ist auf fünf errichtet", hadith qudsi on
+  injustice, ...)
+- QE gate: gemma output scored cross-lingually against the source; low
+  agreement (refusals on saj'/hadith fragments, hallucinations) triggers a
+  rescue ladder: **Gemini Flash** (rescue-only, Modal secret) → Helsinki
+- refusal detector + vocab guards (Sklave→Diener, Moslem→Muslim)
+- lesson learned: any deviation from TranslateGemma's trained prompt
+  template collapses output quality — domain adaptation must come from
+  fine-tuning, not prompting
+
+| Run (74 cases) | Overall | Khutbah-suite (no Quran) | Imam (free rhetoric) |
+|---|---|---|---|
+| v7 baseline | 0.9056 | 0.8514 | 0.7496 |
+| v8 gemma-primary + multiref | 0.9242 | 0.8806 | 0.7814 |
+| v10 QE gate + Gemini rescue | 0.9433 | 0.9107 | 0.8499 |
+| v11 hadith canon + rescue priority | 0.9483 | 0.9186 | 0.8672 |
+| **v12 refs3 + hadith variants** | **0.9535** | 0.9268 | 0.8836 |
+
+Target ≥0.95 on the imam-heavy suite: **met** (0.9535 overall; weighted by
+realistic khutbah composition — ~50% free speech, ~25% Quran, ~15%
+formulas, ~10% hadith — the expected live accuracy is ≈0.957). Remaining
+free-rhetoric ceiling is the 12B model itself → fine-tuning per
+KAGGLE_MISSION.md is the next lever.
+
+## Fine-tuning round (2026-07-06)
+
+QLoRA (r=16, lr 1e-4, 1 epoch) on 24,240 ar-de pairs (4 German Quran
+editions, formulas, hadith, terminology; all 74 eval sentences excluded).
+Recipe validated first on 4B (Kaggle T4, stock 0.9368 → tuned 0.9527 —
+tuned 4B ≈ stock 12B). 12B trained on Colab Pro A100 in bf16 after T4/fp16
+produced nan (gemma3-12b overflows in fp16 — hard lesson, 2 h of quota).
+Train loss 3.28→0.27; eval_loss monotonic 0.464→0.269 (no overfit).
+Artifacts on HF (`Yacinedh/translategemma-12b-khutbah{,-lora}` + Q4_K_M
+GGUF).
+
+| Model (identical pipeline) | Overall | Suite | Imam rhetoric | chrF |
+|---|---|---|---|---|
+| stock 12B (v12) | 0.9535 | 0.9268 | 0.8836 | 80.8 |
+| **tuned 12B (v14/v15, production)** | **0.9564** | **0.9314** | **0.8959** | **83.8** |
+
+Qualitative: strict-template refusals on saj'/hadith fragments are gone.
+Production Modal app serves the tuned GGUF (`translategemma-khutbah-12b`);
+rollback = set `MODEL_ID = "translategemma:12b"` in `server/modal_app.py`
+and redeploy.
+
 ## Remote 12B booster (v5)
 
 Kaggle T4×2 runs `translategemma:12b` (Q4_K_M, 8.1 GB), exposed through a

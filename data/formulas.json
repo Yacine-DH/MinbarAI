@@ -1,0 +1,99 @@
+{
+  "formulas": [
+    {
+      "id": "hajah",
+      "ar": "إن الحمد لله نحمده ونستعينه ونستغفره ونعوذ بالله من شرور أنفسنا ومن سيئات أعمالنا من يهده الله فلا مضل له ومن يضلل فلا هادي له",
+      "de": "Alles Lob gebührt Allah; wir loben Ihn, suchen Seine Hilfe und bitten Ihn um Vergebung. Wir suchen Zuflucht bei Allah vor dem Übel unserer Seelen und vor unseren schlechten Taten. Wen Allah rechtleitet, den kann niemand irreführen, und wen Er irregehen lässt, den kann niemand rechtleiten."
+    },
+    {
+      "id": "hamd-rabb",
+      "ar": "الحمد لله رب العالمين والصلاة والسلام على أشرف الأنبياء والمرسلين",
+      "de": "Alles Lob gebührt Allah, dem Herrn der Welten, und Segen und Friede seien auf dem edelsten der Propheten und Gesandten."
+    },
+    {
+      "id": "shahada-1",
+      "ar": "وأشهد أن لا إله إلا الله وحده لا شريك له",
+      "de": "Ich bezeuge, dass es keinen Gott gibt außer Allah, Ihm allein, ohne Teilhaber."
+    },
+    {
+      "id": "shahada-2",
+      "ar": "وأشهد أن محمدا عبده ورسوله",
+      "de": "Und ich bezeuge, dass Muhammad Sein Diener und Sein Gesandter ist."
+    },
+    {
+      "id": "shahada-2b",
+      "ar": "وأشهد أن نبينا وسيدنا محمدا عبد الله ورسوله",
+      "de": "Und ich bezeuge, dass unser Prophet und Herr Muhammad der Diener Allahs und Sein Gesandter ist."
+    },
+    {
+      "id": "amma-baad",
+      "ar": "أما بعد",
+      "de": "Sodann:"
+    },
+    {
+      "id": "taqwa-haqq",
+      "ar": "اتقوا الله تعالى حق التقوى",
+      "de": "Fürchtet Allah, den Erhabenen, wie es Ihm gebührt."
+    },
+    {
+      "id": "taqwa-ibad",
+      "ar": "اتقوا الله عباد الله",
+      "de": "Fürchtet Allah, o Diener Allahs."
+    },
+    {
+      "id": "wasiyya",
+      "ar": "أوصيكم ونفسي بتقوى الله عز وجل",
+      "de": "Ich empfehle euch und mir selbst die Furcht vor Allah, dem Mächtigen und Erhabenen."
+    },
+    {
+      "id": "sidq-hadith",
+      "ar": "فإن أصدق الحديث كتاب الله وخير الهدي هدي محمد صلى الله عليه وسلم وشر الأمور محدثاتها وكل محدثة بدعة وكل بدعة ضلالة",
+      "de": "Die wahrhaftigste Rede ist das Buch Allahs, und die beste Rechtleitung ist die Rechtleitung Muhammads – Allahs Segen und Friede auf ihm. Die schlimmsten Dinge sind die neu eingeführten; jede Neuerung ist eine Bid'a, und jede Bid'a ist ein Irrweg."
+    },
+    {
+      "id": "salawat-1",
+      "ar": "صلوا وسلموا على المصطفى الهادي الأمين",
+      "de": "Sprecht den Segen und den Friedensgruß über den Auserwählten, den rechtleitenden, vertrauenswürdigen Propheten."
+    },
+    {
+      "id": "salawat-2",
+      "ar": "ثم صلوا وسلموا على خير البرية",
+      "de": "Sodann sprecht den Segen und den Friedensgruß über den Besten der Schöpfung."
+    },
+    {
+      "id": "closing-istighfar",
+      "ar": "أقول قولي هذا وأستغفر الله العظيم لي ولكم فاستغفروه إنه هو الغفور الرحيم",
+      "de": "Ich sage diese meine Worte und bitte Allah, den Gewaltigen, um Vergebung für mich und für euch. So bittet Ihn um Vergebung; Er ist ja der Allvergebende, der Barmherzige."
+    },
+    {
+      "id": "baraka-quran",
+      "ar": "بارك الله لي ولكم في القرآن العظيم ونفعني وإياكم بما فيه من الآيات والذكر الحكيم",
+      "de": "Möge Allah mir und euch den gewaltigen Quran zum Segen machen und mir und euch durch seine Verse und die weise Ermahnung Nutzen schenken."
+    },
+    {
+      "id": "dua-izz",
+      "ar": "اللهم أعز الإسلام والمسلمين",
+      "de": "O Allah, verleihe dem Islam und den Muslimen Stärke."
+    },
+    {
+      "id": "dua-maghfira",
+      "ar": "اللهم اغفر للمسلمين والمسلمات والمؤمنين والمؤمنات الأحياء منهم والأموات",
+      "de": "O Allah, vergib den muslimischen Männern und Frauen und den gläubigen Männern und Frauen, den Lebenden unter ihnen und den Verstorbenen."
+    },
+    {
+      "id": "dua-awtan",
+      "ar": "اللهم آمنا في أوطاننا وأصلح أئمتنا وولاة أمورنا",
+      "de": "O Allah, schenke uns Sicherheit in unseren Ländern und bessere unsere Vorsteher und die Verantwortlichen unserer Angelegenheiten."
+    },
+    {
+      "id": "dua-dunya-akhira",
+      "ar": "اللهم انصر إخواننا المستضعفين في كل مكان",
+      "de": "O Allah, verhilf unseren unterdrückten Geschwistern an jedem Ort zum Sieg."
+    },
+    {
+      "id": "ibadallah-innallah",
+      "ar": "عباد الله إن الله يأمر بالعدل والإحسان وإيتاء ذي القربى وينهى عن الفحشاء والمنكر والبغي يعظكم لعلكم تذكرون",
+      "de": "O Diener Allahs! Allah gebietet Gerechtigkeit, gütig zu sein und den Verwandten zu geben, und Er verbietet das Schändliche, das Verwerfliche und die Gewalttätigkeit. Er ermahnt euch, auf dass ihr bedenken möget."
+    }
+  ]
+}
