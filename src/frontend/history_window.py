@@ -1,4 +1,7 @@
+import html
+import webbrowser
 from datetime import datetime
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -66,6 +69,9 @@ class HistoryWindow(QMainWindow):
         title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         header.addWidget(title)
         header.addStretch()
+        export_btn = QPushButton("Export HTML")
+        export_btn.clicked.connect(self.export_current)
+        header.addWidget(export_btn)
         del_btn = QPushButton("Delete khutba")
         del_btn.clicked.connect(self.delete_current)
         header.addWidget(del_btn)
@@ -154,6 +160,52 @@ class HistoryWindow(QMainWindow):
             ar = e.get("ar", "")
             de = e.get("de", "")
             self.list.addItem(QListWidgetItem(f"🕐 {t}\nAR: {ar}\nDE: {de}"))
+
+    def export_current(self):
+        """Write the selected khutba as a standalone HTML review page and
+        open it — Arabic and German side by side, one row per chunk."""
+        k = self._current_khutba()
+        if not k:
+            return
+        started = self._fmt_dt(k.get("started_at", ""), "%A, %d %B %Y %H:%M")
+        rows = []
+        for e in k.get("entries", []):
+            t = self._fmt_dt(e.get("ts", ""), "%H:%M:%S")
+            ar = html.escape(e.get("ar", ""))
+            de = html.escape(e.get("de", ""))
+            badge = ""
+            if e.get("quran"):
+                badge = f'<span class="badge">&#128214; {html.escape(e["quran"])}</span>'
+            rows.append(
+                f'<tr><td class="t">{t}</td>'
+                f'<td class="ar" dir="rtl">{ar}</td>'
+                f'<td class="de">{de} {badge}</td>'
+                f'<td class="note" contenteditable="true"></td></tr>'
+            )
+        doc = f"""<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
+<title>MinbarAI — {html.escape(started)}</title>
+<style>
+ body {{ font-family: Segoe UI, Arial, sans-serif; margin: 2rem auto; max-width: 1200px; color: #222; }}
+ h1 {{ font-size: 1.3rem; }}
+ table {{ border-collapse: collapse; width: 100%; }}
+ th, td {{ border-bottom: 1px solid #ddd; padding: .55rem .7rem; vertical-align: top; text-align: left; }}
+ th {{ background: #f4f4f4; position: sticky; top: 0; }}
+ .t {{ white-space: nowrap; color: #888; font-size: .85rem; }}
+ .ar {{ font-size: 1.15rem; width: 38%; }}
+ .de {{ width: 42%; }}
+ .note {{ width: 14%; background: #fffbe6; min-width: 8rem; }}
+ .badge {{ background: #e5f3e8; color: #2c6e3f; border-radius: 4px; padding: 0 .4rem; font-size: .8rem; white-space: nowrap; }}
+ p.hint {{ color: #777; font-size: .85rem; }}
+</style></head><body>
+<h1>&#128333; MinbarAI — Khutba vom {html.escape(started)}</h1>
+<p class="hint">{len(rows)} Segmente · Notizen-Spalte ist direkt beschreibbar (Strg+S zum Sichern via Browser-Druck/PDF)</p>
+<table><tr><th>Zeit</th><th>Arabisch</th><th>Deutsch</th><th>Notizen</th></tr>
+{''.join(rows)}
+</table></body></html>"""
+        safe_id = (k.get("id") or "khutba").replace(":", "-")
+        out = Path.cwd() / f"khutba_{safe_id}.html"
+        out.write_text(doc, encoding="utf-8")
+        webbrowser.open(out.as_uri())
 
     def delete_current(self):
         k = self._current_khutba()
